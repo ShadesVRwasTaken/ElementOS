@@ -5,11 +5,14 @@ let nextSyncBatchToken = null;
 let roomsCache = {};
 let isSyncing = false;
 
+// Custom Local Avatar Photo Registry Database Storage
+let customFriendAvatars = JSON.parse(localStorage.getItem('os_friend_avatars') || '{}');
+let targetAvatarUploadRoomId = null;
+
 // Window Layout Geometric Context Cache Tracking States
 let isChatFullscreen = false;
 let regularWindowPosition = { top: "15%", left: "15%", width: "420px", height: "500px" };
 
-// Global browser notification sound file reference
 const elementNotificationSound = new Audio('https://mixkit.co');
 
 function toggleVisibility(id) {
@@ -22,6 +25,24 @@ document.getElementById('taskbar-status-tray').addEventListener('click', () => t
 document.getElementById('btn-show-add-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
 document.getElementById('btn-cancel-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
 
+// Active Hardware Chromebook Battery Synchronization API Component Module
+function initBatterySync() {
+    const batteryEl = document.getElementById('tray-battery');
+    if (navigator.getBattery) {
+        navigator.getBattery().then(battery => {
+            function updateBatteryUI() {
+                const pct = Math.floor(battery.level * 100);
+                batteryEl.textContent = `${battery.charging ? '⚡' : '🔋'} ${pct}%`;
+            }
+            updateBatteryUI();
+            battery.addEventListener('levelchange', updateBatteryUI);
+            battery.addEventListener('chargingchange', updateBatteryUI);
+        });
+    } else {
+        batteryEl.textContent = '🔋 100%';
+    }
+}
+
 // Chromebook Real-Time Live Clock Component Engine
 function runSystemClock() {
     const timeEl = document.getElementById('tray-time');
@@ -32,11 +53,9 @@ function runSystemClock() {
         timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         dateEl.textContent = now.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
-    
     updateClock();
     setInterval(updateClock, 15000);
 }
-
 // Desktop Draggable Window Component Engine
 function makeWindowDraggable() {
     const win = document.getElementById('chat-window');
@@ -66,11 +85,64 @@ function makeWindowDraggable() {
     };
 }
 
-document.getElementById('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('elementos_session');
-    window.location.reload();
-});
-// Native Window Utility Actions Component Modules
+// ChromeOS Settings & Customization Initialization Handlers
+function initSystemSettings() {
+    const colorPicker = document.getElementById('setting-theme-color');
+    const bgUpload = document.getElementById('setting-wallpaper-upload');
+
+    // Load cached preferences safely
+    const savedColor = localStorage.getItem('os_theme_color') || '#0d9488';
+    colorPicker.value = savedColor;
+    document.documentElement.style.setProperty('--theme-primary', savedColor);
+
+    const savedBg = localStorage.getItem('os_desktop_bg');
+    if (savedBg) document.body.style.backgroundImage = `url('${savedBg}')`;
+
+    // Bind setting adjustments listeners
+    colorPicker.addEventListener('input', (e) => {
+        const val = e.target.value;
+        document.documentElement.style.setProperty('--theme-primary', val);
+        localStorage.setItem('os_theme_color', val);
+    });
+
+    bgUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const imgData = event.target.result;
+                document.body.style.backgroundImage = `url('${imgData}')`;
+                localStorage.setItem('os_desktop_bg', imgData);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Handle Split Layout Menu Tab Toggling
+    document.getElementById('tab-btn-friends').addEventListener('click', () => switchDrawerTab('friends'));
+    document.getElementById('tab-btn-settings').addEventListener('click', () => switchDrawerTab('settings'));
+}
+
+function switchDrawerTab(target) {
+    const tabFriends = document.getElementById('tab-btn-friends');
+    const tabSettings = document.getElementById('tab-btn-settings');
+    const contentFriends = document.getElementById('tab-content-friends');
+    const contentSettings = document.getElementById('tab-content-settings');
+
+    if (target === 'friends') {
+        tabFriends.classList.add('active-tab');
+        tabSettings.classList.remove('active-tab');
+        contentFriends.classList.remove('hidden');
+        contentSettings.classList.add('hidden');
+    } else {
+        tabSettings.classList.add('active-tab');
+        tabFriends.classList.remove('active-tab');
+        contentSettings.classList.remove('hidden');
+        contentFriends.classList.add('hidden');
+    }
+}
+
+// Window Management Actions Mapping
 document.getElementById('btn-close-chat').addEventListener('click', () => {
     document.getElementById('chat-window').classList.add('hidden');
     document.getElementById('minimized-dock-indicator').classList.add('hidden');
@@ -79,9 +151,7 @@ document.getElementById('btn-close-chat').addEventListener('click', () => {
 
 document.getElementById('btn-minimize-chat').addEventListener('click', () => {
     const room = roomsCache[currentActiveRoomId];
-    let displayTitle = room?.customName || "Active Chat";
-    
-    document.getElementById('minimized-dock-label').textContent = displayTitle;
+    document.getElementById('minimized-dock-label').textContent = room?.customName || "Active Chat";
     document.getElementById('chat-window').classList.add('hidden');
     document.getElementById('minimized-dock-indicator').classList.remove('hidden');
 });
@@ -94,111 +164,77 @@ document.getElementById('minimized-dock-indicator').addEventListener('click', ()
 document.getElementById('btn-fullscreen-chat').addEventListener('click', () => {
     const win = document.getElementById('chat-window');
     const btn = document.getElementById('btn-fullscreen-chat');
-    
     if (!isChatFullscreen) {
-        regularWindowPosition.top = win.style.top || "15%";
-        regularWindowPosition.left = win.style.left || "15%";
-        regularWindowPosition.width = win.style.width || "420px";
-        regularWindowPosition.height = win.style.height || "500px";
-        
-        win.style.top = "0px";
-        win.style.left = "0px";
-        win.style.width = "100vw";
-        win.style.height = "calc(100vh - 3.25rem)";
-        btn.textContent = "❐";
-        isChatFullscreen = true;
+        regularWindowPosition.top = win.style.top || "15%"; regularWindowPosition.left = win.style.left || "15%";
+        regularWindowPosition.width = win.style.width || "420px"; regularWindowPosition.height = win.style.height || "500px";
+        win.style.top = "0px"; win.style.left = "0px"; win.style.width = "100vw"; win.style.height = "calc(100vh - 3.25rem)";
+        btn.textContent = "❐"; isChatFullscreen = true;
     } else {
-        win.style.top = regularWindowPosition.top;
-        win.style.left = regularWindowPosition.left;
-        win.style.width = regularWindowPosition.width;
-        win.style.height = regularWindowPosition.height;
-        btn.textContent = "🔲";
-        isChatFullscreen = false;
+        win.style.top = regularWindowPosition.top; win.style.left = regularWindowPosition.left; win.style.width = regularWindowPosition.width; win.style.height = regularWindowPosition.height;
+        btn.textContent = "🔲"; isChatFullscreen = false;
     }
 });
 
-// Chromebook Status Center Sliding Toast Alert System
 function triggerSystemMessageToast(sender, body) {
     const toast = document.getElementById('system-message-toast');
-    const cleanSender = sender.split(':')[0].replace('@', '');
-    
-    document.getElementById('toast-sender-title').textContent = `Message from ${cleanSender}`;
+    document.getElementById('toast-sender-title').textContent = `Message from ${sender.split(':')[0].replace('@', '')}`;
     document.getElementById('toast-message-body').textContent = body;
-    
-    // Play sound element cleanly
-    try {
-        elementNotificationSound.currentTime = 0;
-        elementNotificationSound.play();
-    } catch(err) { console.log("Sound interaction delayed."); }
-
+    try { elementNotificationSound.currentTime = 0; elementNotificationSound.play(); } catch(e){}
     toast.classList.remove('hidden');
-    
-    // Auto-hide toast after a 4-second timeout interval
-    setTimeout(() => {
-        toast.classList.add('hidden');
-    }, 4000);
+    setTimeout(() => toast.classList.add('hidden'), 4000);
 }
 
-// Primary System Core Lifecycle Initializer Entry Sequence Hook
+document.getElementById('btn-logout').addEventListener('click', () => { localStorage.removeItem('elementos_session'); window.location.reload(); });
+// Native Matrix Core Client Initializer Hook Handlers
 window.addEventListener('load', () => {
-    runSystemClock();
-    makeWindowDraggable();
+    runSystemClock(); makeWindowDraggable(); initBatterySync(); initSystemSettings();
     document.getElementById('chat-window').classList.add('hidden');
     
+    // Bind Local Contact Avatar File upload observer proxy changes
+    document.getElementById('friend-avatar-file-proxy').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && targetAvatarUploadRoomId) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                customFriendAvatars[targetAvatarUploadRoomId] = event.target.result;
+                localStorage.setItem('os_friend_avatars', JSON.stringify(customFriendAvatars));
+                renderFriendsList();
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
     try {
         const saved = localStorage.getItem('elementos_session');
-        if (saved) {
-            sessionData = JSON.parse(saved);
-            enterDesktopMode();
-        }
-    } catch (err) {
-        console.log("Cached access token handshake omitted.");
-    }
+        if (saved) { sessionData = JSON.parse(saved); enterDesktopMode(); }
+    } catch (err) {}
 });
 
-// Native HTTP REST Authentication Protocol
 document.getElementById('btn-login').addEventListener('click', async () => {
     let baseUrl = document.getElementById('login-homeserver').value.trim();
     let username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value.trim();
-
     if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
-    if (!username || !password) return alert('Please enter all credentials.');
-
-    if (!username.includes(':') && username.startsWith('@')) {
-        const domain = baseUrl.replace('https://', '').replace('http://', '');
-        username = `${username}:${domain}`;
-    }
+    if (!username || !password) return alert('Missing fields.');
+    if (!username.includes(':') && username.startsWith('@')) username = `${username}:${baseUrl.replace('https://','').replace('http://','')}`;
 
     try {
-        const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
-            method: 'POST',
-            body: JSON.stringify({ type: "m.login.password", identifier: { type: "m.id.user", user: username }, password: password }),
-            headers: { 'Content-Type': 'application/json' }
-        });
-        if (!response.ok) {
-            const errDetails = await response.json();
-            throw new Error(errDetails.error || "Invalid username or password.");
-        }
+        const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, { method: 'POST', body: JSON.stringify({ type: "m.login.password", identifier: { type: "m.id.user", user: username }, password: password }), headers: { 'Content-Type': 'application/json' } });
+        if (!response.ok) throw new Error((await response.json()).error || "Login rejection.");
         const data = await response.json();
         sessionData = { baseUrl, accessToken: data.access_token, userId: data.user_id };
         localStorage.setItem('elementos_session', JSON.stringify(sessionData));
         enterDesktopMode();
     } catch (err) { alert('Authentication Error: ' + err.message); }
 });
+
 function enterDesktopMode() {
     if (!sessionData) return;
-    const shortUser = sessionData.userId.replace('@', '').split(':')[0];
-    
     document.getElementById('menu-displayname').textContent = sessionData.userId;
-    document.getElementById('menu-avatar').textContent = shortUser.substring(0, 2).toUpperCase();
+    document.getElementById('menu-avatar').textContent = sessionData.userId.replace('@','').substring(0,2).toUpperCase();
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('desktop').classList.remove('hidden');
-    
-    if (!isSyncing) {
-        isSyncing = true;
-        startSyncLoop();
-    }
+    if (!isSyncing) { isSyncing = true; startSyncLoop(); }
 }
 
 async function startSyncLoop() {
@@ -207,7 +243,6 @@ async function startSyncLoop() {
         if (nextSyncBatchToken) url += `&since=${nextSyncBatchToken}`;
         try {
             const response = await fetch(url, { headers: { 'Authorization': `Bearer ${sessionData.accessToken}` } });
-            if (!response.ok) throw new Error();
             const syncData = await response.json();
             nextSyncBatchToken = syncData.next_batch;
             processSyncPayload(syncData);
@@ -219,68 +254,58 @@ async function startSyncLoop() {
 function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
-            // Setup cache structural maps securely
-            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null, isDirect: false };
-            data.account_data?.events?.forEach(ev => { if (ev.type === "m.direct") roomsCache[roomId].isDirect = true; });
+            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null };
             data.rooms.join[roomId].state?.events?.forEach(ev => { if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; });
-            
-            const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
-            timelineEvents.forEach(ev => {
-                // FIXED: Event parsing aligned explicitly on m.room.message type actions
+            data.rooms.join[roomId].timeline?.events?.forEach(ev => {
                 if (ev.type === 'm.room.message' && ev.content?.body) {
                     roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body });
-                    
-                    // Inbound trigger: If the message arrived while window is closed or unfocused, fire audio/toast notifications
                     if (ev.sender !== sessionData.userId && (roomId !== currentActiveRoomId || document.getElementById('chat-window').classList.contains('hidden'))) {
                         triggerSystemMessageToast(ev.sender, ev.content.body);
                     }
-
                     if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body);
                 }
             });
         }
     }
-    if (data.rooms && data.rooms.leave) {
-        for (const roomId in data.rooms.leave) {
-            delete roomsCache[roomId];
-            if (currentActiveRoomId === roomId) { document.getElementById('chat-window').classList.add('hidden'); currentActiveRoomId = null; }
-        }
-    }
+    if (data.rooms && data.rooms.leave) data.rooms.leave.forEach(roomId => { delete roomsCache[roomId]; if(currentActiveRoomId===roomId){document.getElementById('chat-window').classList.add('hidden');currentActiveRoomId=null;} });
     renderFriendsList();
 }
 
 function renderFriendsList() {
     const listDiv = document.getElementById('friends-list');
     const roomKeys = Object.keys(roomsCache);
-    if (roomKeys.length === 0) { listDiv.innerHTML = `<p class="loading-label">No active friend DMs.</p>`; return; }
+    if (roomKeys.length === 0) { listDiv.innerHTML = `<p class="loading-label">No active channels.</p>`; return; }
     listDiv.innerHTML = '';
     roomKeys.forEach(roomId => {
         const room = roomsCache[roomId];
         let displayLabel = room.customName || (roomId.length > 15 ? roomId.substring(0, 12) + '...' : roomId);
+        const savedAvatar = customFriendAvatars[roomId];
+
         const item = document.createElement('div');
         item.className = "friend-item";
         item.innerHTML = `
             <div class="friend-meta">
-                <div class="friend-avatar">👤</div>
+                <div class="friend-avatar" style="${savedAvatar ? `background-image: url('\${savedAvatar}'); text-indent: -9999px;` : ''}">👤</div>
                 <div class="friend-name" title="${roomId}">${displayLabel}</div>
             </div>
-            <div class="friend-actions-group" style="display: flex; gap: 4px;">
+            <div class="friend-actions-group">
                 <button class="action-icon-btn btn-chat">Chat</button>
-                <button class="action-icon-btn btn-rename" style="background: rgba(234, 179, 8, 0.15); color: #fbbf24; border-color: rgba(234, 179, 8, 0.25);">✏️</button>
+                <button class="action-icon-btn btn-avatar-up" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.25);">🖼️</button>
                 <button class="action-icon-btn btn-leave" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.25);">❌</button>
             </div>`;
-        item.querySelector('.btn-chat').addEventListener('click', (e) => { e.stopPropagation(); openChatWindow(roomId); });
-        item.querySelector('.btn-rename').addEventListener('click', async (e) => { e.stopPropagation(); const newName = prompt("Nickname:", room.customName || displayLabel); if (newName && newName.trim() !== "") renameFriendRoom(roomId, newName.trim()); });
-        item.querySelector('.btn-leave').addEventListener('click', async (e) => { e.stopPropagation(); if (confirm("Delete friend chat?")) leaveFriendRoom(roomId); });
+
+        item.querySelector('.btn-chat').addEventListener('click', () => openChatWindow(roomId));
+        item.querySelector('.btn-leave').addEventListener('click', () => { if(confirm("Delete friend DM?")) leaveFriendRoom(roomId); });
+        
+        // Custom avatar file injection proxy event bind
+        item.querySelector('.btn-avatar-up').addEventListener('click', (e) => {
+            e.stopPropagation();
+            targetAvatarUploadRoomId = roomId;
+            document.getElementById('friend-avatar-file-proxy').click();
+        });
+
         listDiv.appendChild(item);
     });
-}
-
-async function renameFriendRoom(roomId, newName) {
-    try {
-        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.name/`, { method: 'PUT', body: JSON.stringify({ name: newName }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
-        if (res.ok) { roomsCache[roomId].customName = newName; renderFriendsList(); }
-    } catch(e) {}
 }
 
 async function leaveFriendRoom(roomId) {
@@ -292,14 +317,12 @@ async function leaveFriendRoom(roomId) {
 
 document.getElementById('btn-add-friend').addEventListener('click', async () => {
     const targetMxid = document.getElementById('friend-mxid').value.trim();
-    if (!targetMxid.startsWith('@')) return alert('Use format: @user:server.com');
+    if (!targetMxid.startsWith('@')) return alert('Use handle format: @user:server.com');
     try {
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
-        if (!res.ok) throw new Error();
         const data = await res.json();
-        roomsCache[data.room_id] = { messages: [], customName: targetMxid.replace('@', '').split(':')[0], isDirect: true };
-        document.getElementById('friend-mxid').value = '';
-        document.getElementById('add-friend-ui').classList.add('hidden');
+        roomsCache[data.room_id] = { messages: [], customName: targetMxid.replace('@','').split(':')[0] };
+        document.getElementById('friend-mxid').value = ''; document.getElementById('add-friend-ui').classList.add('hidden');
         renderFriendsList();
     } catch (err) { alert('Friend creation failed.'); }
 });
@@ -318,27 +341,23 @@ function openChatWindow(roomId) {
 function appendLiveMessage(sender, body) {
     const container = document.getElementById('chat-messages');
     const isMe = sender === sessionData.userId;
-    const cleanSender = sender.split(':')[0].replace('@', '');
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
-            <span class="msg-sender">${cleanSender}</span>
+            <span class="msg-sender">${sender.split(':')[0].replace('@','')}</span>
             <div class="msg-bubble">${body}</div>
         </div>`;
-    container.insertAdjacentHTML('beforeend', msgHtml);
-    container.scrollTop = container.scrollHeight;
+    container.insertAdjacentHTML('beforeend', msgHtml); container.scrollTop = container.scrollHeight;
 }
 
 document.getElementById('btn-send').addEventListener('click', sendMessage);
 document.getElementById('chat-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
 async function sendMessage() {
-    const input = document.getElementById('chat-input');
-    const text = input.value.trim();
+    const input = document.getElementById('chat-input'); const text = input.value.trim();
     if (!text || !currentActiveRoomId) return;
     try {
         const txnId = Date.now();
-        // FIXED: Re-aligned event body schema back to strict m.room.message type parameters
         await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, { method: 'PUT', body: JSON.stringify({ msgtype: "m.text", body: text }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         input.value = '';
-    } catch (e) { console.log("Send failed."); }
+    } catch (e) {}
 }

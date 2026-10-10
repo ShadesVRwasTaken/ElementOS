@@ -1,4 +1,9 @@
-/* Core Layout Settings & Universal Variables */
+/* Core Layout Settings & Universal Themes */
+:root {
+    --theme-primary: #0d9488;
+    --theme-primary-hover: #0cc2b0;
+}
+
 * { 
     box-sizing: border-box; 
     margin: 0; 
@@ -13,12 +18,33 @@ body {
     user-select: none;
     background: #111827 url('https://unsplash.com') center/cover no-repeat;
     color: #ffffff;
+    transition: background 0.2s ease;
 }
 
 .hidden { display: none !important; }
 .flex-container { display: flex; gap: 0.5rem; }
 .flex-1 { flex: 1; }
 .flex-column { display: flex; flex-direction: column; }
+
+/* Dynamic Accent Modifiers over Native Form Buttons */
+.sys-btn { background: var(--theme-primary) !important; }
+.sys-btn:hover { background: var(--theme-primary-hover) !important; }
+.add-btn-circle { background: var(--theme-primary) !important; }
+.action-icon-btn { color: var(--theme-primary) !important; background: rgba(13, 148, 136, 0.12) !important; border-color: rgba(13, 148, 136, 0.2) !important; }
+
+/* Tab Toggle Component Aesthetics */
+.menu-tab-trigger.active-tab {
+    border-bottom: 2px solid var(--theme-primary) !important;
+    color: #ffffff !important;
+    background: rgba(255,255,255,0.02) !important;
+}
+
+.tab-content-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
 
 /* Authentic ChromeOS Bottom Taskbar Shelf Layout */
 .taskbar {
@@ -38,69 +64,20 @@ body {
     z-index: 40;
 }
 
-.left-shelf-group {
-    display: flex;
-    align-items: center;
-}
-
+.left-shelf-group { display: flex; align-items: center; }
 .launcher-btn { 
-    width: 34px; 
-    height: 34px; 
-    background: rgba(255, 255, 255, 0.05); 
-    border-radius: 50%; 
-    border: none; 
-    color: #0d9488; 
-    font-size: 1rem;
-    cursor: pointer; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    transition: background 0.2s;
+    width: 34px; height: 34px; background: rgba(255, 255, 255, 0.05); border-radius: 50%; border: none; 
+    color: var(--theme-primary); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s;
 }
 .launcher-btn:hover { background: rgba(255, 255, 255, 0.12); }
 
-/* Chromebook Unified Tray Corner Block */
 .chromeos-status-tray {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    padding: 0.25rem 0.85rem;
-    border-radius: 1.5rem;
-    cursor: pointer;
-    transition: background 0.2s;
+    display: flex; align-items: center; gap: 0.75rem; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 0.25rem 0.85rem; border-radius: 1.5rem; cursor: pointer; transition: background 0.2s;
 }
-.chromeos-status-tray:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-.status-icon {
-    font-size: 0.75rem;
-    color: #e5e7eb;
-}
-
-.tray-divider {
-    width: 1px;
-    height: 14px;
-    background: rgba(255, 255, 255, 0.15);
-    margin: 0 0.15rem;
-}
-
-.tray-time-group {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.tray-time {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #ffffff;
-}
-
-.tray-date {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #9ca3af;
-}
+.chromeos-status-tray:hover { background: rgba(255, 255, 255, 0.15); }
+.status-icon { font-size: 0.75rem; color: #e5e7eb; }
+.tray-divider { width: 1px; height: 14px; background: rgba(255, 255, 255, 0.15); margin: 0 0.15rem; }
+.tray-time-group { display: flex; align-items: center; gap: 0.4rem; }
+.tray-time { font-size: 0.75rem; font-weight: 600; color: #ffffff; }
+.tray-date { font-size: 0.75rem; font-weight: 500; color: #9ca3af; }
