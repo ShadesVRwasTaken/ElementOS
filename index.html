@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ElementOS</title>
+    <!-- Core Split Layout Stylesheets -->
     <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="windows.css">
 </head>
@@ -11,7 +12,7 @@
 
     <!-- 1. SYSTEM SECURITY LOGIN SIGN-IN -->
     <div id="login-screen">
-        <div class="login-card">
+        <div class="login-card liquid-glass">
             <div class="sys-logo">🟢</div>
             <h2>Sign in to ElementOS</h2>
             <input id="login-homeserver" type="text" value="https://matrix.org" class="sys-input" placeholder="Homeserver">
@@ -23,14 +24,20 @@
 
     <!-- 2. MAIN ACTIVE DESKTOP FRAMEWORK -->
     <main id="desktop" class="hidden">
-        <!-- Floating Active Messaging Window -->
-        <div id="chat-window" class="window flex-column">
+        <!-- Grid Space for Dynamic App Shortcuts -->
+        <div id="desktop-apps-grid" style="position: absolute; top: 1.5rem; left: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; z-index: 10;"></div>
+
+        <!-- Floating Resizable Chat Window -->
+        <div id="chat-window" class="window flex-column liquid-glass">
             <div class="window-header" id="chat-header">
                 <span id="chat-title" class="window-title">Chat</span>
-                <div class="window-controls-shelf" style="display: flex; align-items: center; gap: 10px;">
-                    <button id="btn-minimize-chat" class="window-control-action" title="Minimize" style="background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 1.1rem; padding-bottom: 4px;">—</button>
-                    <button id="btn-fullscreen-chat" class="window-control-action" title="Fullscreen" style="background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 0.85rem;">🔲</button>
-                    <button id="btn-close-chat" class="window-close" title="Close" style="margin: 0; padding: 0;">&times;</button>
+                <div class="window-controls-shelf" style="display: flex; align-items: center; gap: 8px;">
+                    <!-- Chrome-style window splitting options -->
+                    <button class="btn-snap-left window-control-action" title="Snap Left" style="font-size:0.75rem; background:none; border:none; color:#9ca3af; cursor:pointer;">◀</button>
+                    <button class="btn-snap-right window-control-action" title="Snap Right" style="font-size:0.75rem; background:none; border:none; color:#9ca3af; cursor:pointer;">▶</button>
+                    <button id="btn-minimize-chat" class="window-control-action" title="Minimize">—</button>
+                    <button id="btn-fullscreen-chat" class="window-control-action" title="Fullscreen">🔲</button>
+                    <button id="btn-close-chat" class="window-close">&times;</button>
                 </div>
             </div>
             <div id="chat-messages" class="chat-body"></div>
@@ -38,46 +45,64 @@
                 <input id="chat-input" type="text" placeholder="Type a message..." class="sys-input">
                 <button id="btn-send" class="sys-btn send-sizing">Send</button>
             </div>
+            <!-- Resize handle grip -->
+            <div class="window-resize-handle"></div>
+        </div>
+        <!-- Floating Resizable Virtual App Runner Iframe Window -->
+        <div id="app-runner-window" class="window flex-column liquid-glass hidden" style="width: 600px; height: 500px; top: 10%; left: 30%;">
+            <div class="window-header" id="app-runner-header">
+                <span id="app-runner-title" class="window-title">Web App</span>
+                <div class="window-controls-shelf" style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn-snap-left window-control-action" title="Snap Left" style="font-size:0.75rem; background:none; border:none; color:#9ca3af; cursor:pointer;">◀</button>
+                    <button class="btn-snap-right window-control-action" title="Snap Right" style="font-size:0.75rem; background:none; border:none; color:#9ca3af; cursor:pointer;">▶</button>
+                    <button id="btn-close-app" class="window-close" style="margin:0; padding:0;">&times;</button>
+                </div>
+            </div>
+            <div style="flex: 1; width: 100%; height: 100%; background: #fff; overflow: hidden; position: relative;">
+                <!-- Glass overlay prevents mouse tracking loss inside iframes during a drag/resize -->
+                <div class="iframe-drag-shield hidden" style="position: absolute; inset: 0; z-index: 10; background: transparent;"></div>
+                <iframe id="app-runner-iframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            <div class="window-resize-handle"></div>
         </div>
 
         <!-- 🔔 PREMIUM SLIDING SYSTEM TOAST CARD -->
-        <div id="system-message-toast" class="hidden" style="position: absolute; bottom: 4.5rem; right: 1rem; width: 320px; background: rgba(17, 24, 39, 0.95); border-left: 4px solid var(--theme-primary, #0d9488); border-top: 1px solid rgba(255,255,255,0.1); border-right: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem; padding: 1rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100; display: flex; align-items: center; gap: 14px;">
-            <div style="font-size: 1.25rem; background: rgba(13, 148, 136, 0.15); width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--theme-primary, #2dd4bf); flex-shrink: 0;">💬</div>
+        <div id="system-message-toast" class="hidden liquid-glass" style="position: absolute; bottom: 4.5rem; right: 1rem; width: 320px; border-left: 4px solid var(--theme-primary, #0d9488); padding: 1rem; z-index: 100; display: flex; align-items: center; gap: 14px;">
+            <div style="font-size: 1.25rem; background: rgba(255,255,255,0.1); width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--theme-primary, #2dd4bf); flex-shrink: 0;">💬</div>
             <div style="display: flex; flex-direction: column; overflow: hidden; flex: 1;">
                 <h5 id="toast-sender-title" style="font-size: 0.8rem; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px;">Sender</h5>
                 <p id="toast-message-body" style="font-size: 0.75rem; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;">Preview</p>
             </div>
         </div>
 
-        <!-- Taskbar Minimized Window Placeholder Dock Segment -->
-        <div id="minimized-dock-indicator" class="hidden" style="position: absolute; bottom: 4rem; left: 1rem; background: rgba(31, 41, 55, 0.9); border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); cursor: pointer; display: flex; align-items: center; gap: 8px; z-index: 35;">
+        <!-- Taskbar Minimized Window Placeholder Dock -->
+        <div id="minimized-dock-indicator" class="hidden liquid-glass" style="position: absolute; bottom: 4rem; left: 1rem; padding: 0.5rem 1rem; cursor: pointer; display: flex; align-items: center; gap: 8px; z-index: 35;">
             <span style="color: var(--theme-primary, #2dd4bf);">💬</span>
             <span id="minimized-dock-label" style="font-size: 0.75rem; font-weight: 500; color: #e5e7eb;">Active Chat</span>
         </div>
     </main>
 
     <!-- 3. CHROMEOS-STYLE SPLIT TABBED DRAWER PANEL MENU -->
-    <div id="friends-panel" class="hidden">
+    <div id="friends-panel" class="hidden liquid-glass">
         <div class="menu-profile-banner">
             <div id="menu-avatar" class="menu-avatar">E</div>
             <div class="menu-user-details">
                 <p id="menu-displayname" class="menu-username">@user</p>
-                <p class="menu-status-text">ElementOS System Interface</p>
+                <p class="menu-status-text">ElementOS Premium Architecture</p>
             </div>
         </div>
 
-        <div style="display: flex; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
-            <button id="tab-btn-friends" class="menu-tab-trigger active-tab" style="flex: 1; padding: 0.75rem; background: none; border: none; color: #fff; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">👥 Friends DMs</button>
-            <button id="tab-btn-settings" class="menu-tab-trigger" style="flex: 1; padding: 0.75rem; background: none; border: none; color: #9ca3af; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">⚙️ OS Settings</button>
+        <div style="display: flex; background: rgba(0,0,0,0.15); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <button id="tab-btn-friends" class="menu-tab-trigger active-tab">👥 Friends</button>
+            <button id="tab-btn-apps" class="menu-tab-trigger">📱 Apps</button>
+            <button id="tab-btn-settings" class="menu-tab-trigger">⚙️ Settings</button>
         </div>
 
-        <!-- TAB CONTENT A: FRIENDS INTERFACE CONTAINER -->
         <div id="tab-content-friends" class="tab-content-panel">
             <div class="panel-header">
                 <h3>Contacts & Friends</h3>
                 <button id="btn-show-add-friend" class="add-btn-circle">+</button>
             </div>
-            
             <div id="add-friend-ui" class="add-friend-box hidden">
                 <input id="friend-mxid" type="text" placeholder="@username:server.com" class="sys-input add-friend-sizing">
                 <div class="flex-container">
@@ -85,13 +110,29 @@
                     <button id="btn-cancel-friend" class="sys-btn cancel-btn">Cancel</button>
                 </div>
             </div>
-
             <div id="friends-list" class="friend-list-container">
                 <p class="loading-label">Loading inner circle...</p>
             </div>
         </div>
 
-        <!-- TAB CONTENT B: HARDWARE & CUSTOMIZATION SETTINGS CONTAINER -->
+        <div id="tab-content-apps" class="tab-content-panel hidden">
+            <div class="panel-header">
+                <h3>Installed Web Apps</h3>
+                <button id="btn-show-add-app" class="add-btn-circle">+</button>
+            </div>
+            <div id="add-app-ui" class="add-friend-box hidden">
+                <input id="app-input-name" type="text" placeholder="App Name (e.g. Google Docs)" class="sys-input add-friend-sizing">
+                <input id="app-input-url" type="text" placeholder="https://google.com..." class="sys-input add-friend-sizing">
+                <div class="flex-container">
+                    <button id="btn-add-app" class="sys-btn add-friend-sizing flex-1">Add App</button>
+                    <button onclick="toggleVisibility('add-app-ui')" class="sys-btn cancel-btn">Cancel</button>
+                </div>
+            </div>
+            <div id="os-apps-list" class="friend-list-container">
+                <p class="loading-label">No custom web apps installed.</p>
+            </div>
+        </div>
+
         <div id="tab-content-settings" class="tab-content-panel hidden" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; flex: 1;">
             <div>
                 <h4 style="font-size: 0.8rem; font-weight: 600; color: #e5e7eb; margin-bottom: 0.5rem;">System Accent Color</h4>
@@ -100,12 +141,11 @@
                     <button id="btn-reset-color" class="sys-btn" style="width: auto; padding: 0.35rem 0.75rem; font-size: 0.7rem; background: rgba(255,255,255,0.1) !important;">Reset Accent</button>
                 </div>
             </div>
-
             <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem;">
-                <h4 style="font-size: 0.8rem; font-weight: 600; color: #e5e7eb; margin-bottom: 0.5rem;">Desktop Wallpaper Background</h4>
+                <h4 style="font-size: 0.8rem; font-weight: 600; color: #e5e7eb; margin-bottom: 0.5rem;">Desktop Wallpaper</h4>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <label class="sys-btn" style="display: inline-block; text-align: center; font-size: 0.75rem; padding: 0.5rem; width: auto; cursor: pointer; margin: 0;">
-                        📁 Upload Wallpaper Image
+                        📁 Upload Image
                         <input id="setting-wallpaper-upload" type="file" accept="image/*" class="hidden">
                     </label>
                     <button id="btn-reset-wallpaper" class="sys-btn" style="width: auto; padding: 0.5rem 0.75rem; font-size: 0.75rem; background: rgba(255,255,255,0.1) !important;">Reset Wallpaper</button>
@@ -113,23 +153,18 @@
             </div>
         </div>
 
-        <!-- Disconnect Action Anchor Row -->
-        <div class="logout-footer">
-            <button id="btn-logout">Disconnect Account</button>
-        </div>
+        <div class="logout-footer"><button id="btn-logout">Disconnect Account</button></div>
     </div>
 
-    <!-- Hidden Avatar Input Pipeline Proxy -->
+    <!-- Hidden Local Proxy Upload Slots -->
     <input id="friend-avatar-file-proxy" type="file" accept="image/*" class="hidden">
+    <input id="app-icon-file-proxy" type="file" accept="image/*" class="hidden">
 
     <!-- 4. CHROMBOOK-STYLE SYSTEM SHELF TASKBAR -->
-    <footer class="taskbar">
-        <div class="left-shelf-group">
-            <button class="launcher-btn">🟢</button>
-        </div>
-        
-        <div id="taskbar-status-tray" class="chromeos-status-tray">
-            <span id="taskbar-user-status" style="width: 7px; height: 7px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e;" title="Matrix Account Online"></span>
+    <footer class="taskbar liquid-glass" style="border-radius: 0; border-bottom: none; border-left: none; border-right: none;">
+        <div class="left-shelf-group"><button class="launcher-btn">🟢</button></div>
+        <div id="taskbar-status-tray" class="chromeos-status-tray liquid-glass" style="box-shadow: none;">
+            <span id="taskbar-user-status" style="width: 7px; height: 7px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e;"></span>
             <span class="status-icon">📶</span>
             <span id="tray-battery" class="status-icon">🔋 Checking...</span>
             <div class="tray-divider"></div>

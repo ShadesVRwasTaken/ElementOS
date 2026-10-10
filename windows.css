@@ -1,13 +1,8 @@
-/* UI Security Prompt Windows */
 #login-screen {
-    position: absolute; inset: 0; background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    position: absolute; inset: 0; background: rgba(0, 0, 0, 0.4);
     display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50;
 }
-.login-card {
-    background: rgba(31, 41, 55, 0.85); padding: 2rem; border-radius: 1rem; width: 360px;
-    border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-}
+.login-card { padding: 2rem; border-radius: 1.25rem; width: 360px; text-align: center; }
 .sys-logo { width: 70px; height: 70px; background: var(--theme-primary); border-radius: 50%; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
 .login-card h2 { margin-bottom: 1.5rem; font-size: 1.25rem; font-weight: 600; }
 .sys-input {
@@ -16,64 +11,52 @@
 }
 .sys-input:focus { border-color: var(--theme-primary); }
 
-/* Floating Active Chat Windows */
-.window {
-    position: absolute; top: 15%; left: 15%; width: 420px; height: 500px;
-    background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 0.75rem; z-index: 30; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); overflow: hidden;
-}
-.window-header { background: rgba(31, 41, 55, 0.8); padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); cursor: move; }
-.window-title { font-size: 0.85rem; font-weight: 500; color: #e5e7eb; }
-.window-close { background: none; border: none; color: #9ca3af; font-size: 1.25rem; cursor: pointer; }
-.window-close:hover { color: #fff; }
+.window { position: absolute; top: 15%; left: 15%; width: 420px; height: 500px; border-radius: 1.25rem; z-index: 30; overflow: hidden; }
+.window-header { background: rgba(255, 255, 255, 0.02); padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.12); cursor: move; }
+.window-title { font-size: 0.85rem; font-weight: 600; color: #ffffff; }
+.window-close { background: none; border: none; color: #f87171; font-size: 1.25rem; cursor: pointer; }
 .chat-body { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; }
-.chat-footer { padding: 0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; gap: 0.5rem; background: rgba(3, 7, 18, 0.4); }
+.chat-footer { padding: 0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; gap: 0.5rem; background: rgba(0, 0, 0, 0.2); }
 .chat-footer .sys-input { margin-bottom: 0; flex: 1; }
 .send-sizing { width: auto; padding: 0 1.25rem; }
-
-/* ChromeOS Unified Tabbed Drawer Panel Layout */
-#friends-panel {
-    position: absolute; bottom: 4rem; right: 0.5rem; width: 360px; height: 480px;
-    background: rgba(31, 41, 55, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 1.5rem;
-    display: flex; flex-direction: column; z-index: 40; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.6); overflow: hidden;
-    backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-}
-.menu-profile-banner { padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.85rem; background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+#friends-panel { position: absolute; bottom: 4rem; right: 0.5rem; width: 360px; height: 480px; border-radius: 1.5rem; display: flex; flex-direction: column; z-index: 40; }
+.menu-profile-banner { padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
 .menu-avatar { width: 42px; height: 42px; background: linear-gradient(135deg, #0d9488, #0e7490); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 700; }
 .menu-user-details { display: flex; flex-direction: column; overflow: hidden; }
-.menu-username { font-size: 0.85rem; font-weight: 600; color: #f3f4f6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-username { font-size: 0.85rem; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu-status-text { font-size: 0.7rem; color: #9ca3af; }
 
 .panel-header { padding: 0.85rem 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; }
-.panel-header h3 { font-size: 0.85rem; font-weight: 600; color: #d1d5db; letter-spacing: 0.025em; }
-.add-btn-circle { width: 28px; height: 28px; border-radius: 50%; border: none; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.add-friend-box { padding: 1rem; background: rgba(3, 7, 18, 0.5); border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; gap: 0.5rem; }
+.panel-header h3 { font-size: 0.85rem; font-weight: 600; color: #e5e7eb; }
+.add-friend-box { padding: 1rem; background: rgba(0, 0, 0, 0.2); border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; gap: 0.5rem; }
 .add-friend-sizing { font-size: 0.75rem; padding: 0.5rem; }
-.cancel-btn { font-size: 0.75rem; padding: 0.4rem; background: rgba(255,255,255,0.1); color: white; width: auto; }
+.cancel-btn { font-size: 0.75rem; padding: 0.4rem; background: rgba(255,255,255,0.08); color: white; width: auto; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem; cursor: pointer; }
 .friend-list-container { flex: 1; overflow-y: auto; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .loading-label { font-size: 0.75rem; color: #9ca3af; text-align: center; padding: 2rem 0; }
-.logout-footer { padding: 0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.15); text-align: center; }
+.logout-footer { padding: 0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.2); text-align: center; }
 #btn-logout { background: none; border: none; color: #f87171; font-size: 0.75rem; cursor: pointer; }
 
-/* Friend Cards Flex Grid Layout */
-.friend-item { 
-    display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; 
-    border-radius: 0.75rem; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.04);
-    cursor: pointer; transition: all 0.2s; min-height: 48px;
-}
+.friend-item { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; border-radius: 0.75rem; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.04); cursor: pointer; transition: all 0.2s; min-height: 48px; }
 .friend-item:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); }
 .friend-meta { display: flex; align-items: center; gap: 0.65rem; flex: 1; overflow: hidden; }
-.friend-avatar { width: 32px; height: 32px; background: #115e59; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; flex-shrink: 0; background-size: cover; background-position: center; }
-.friend-name { font-size: 0.8rem; font-weight: 500; color: #e5e7eb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.friend-avatar { width: 32px; height: 32px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; flex-shrink: 0; background-size: cover; background-position: center; }
+.friend-name { font-size: 0.8rem; font-weight: 500; color: #e5e7eb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
 .friend-actions-group { display: flex; gap: 0.35rem; flex-shrink: 0; margin-left: 0.5rem; }
-.action-icon-btn { background: rgba(13, 148, 136, 0.15); border: 1px solid rgba(13, 148, 136, 0.25); padding: 0.35rem 0.6rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.75rem; font-weight: 500; }
-.action-icon-btn:hover { background: var(--theme-primary) !important; color: #ffffff !important; }
+.action-icon-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 0.35rem 0.6rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.75rem; font-weight: 500; }
 
-/* Text Bubble Formatting */
 .msg-wrap { display: flex; flex-direction: column; margin-bottom: 0.25rem; }
 .msg-wrap.me { align-items: flex-end; }
 .msg-wrap.them { align-items: flex-start; }
 .msg-sender { font-size: 0.65rem; color: #9ca3af; margin-bottom: 0.15rem; padding: 0 0.25rem; }
 .msg-bubble { padding: 0.5rem 0.75rem; border-radius: 0.75rem; max-width: 80%; font-size: 0.85rem; word-break: break-word; }
-.msg-wrap.me .msg-bubble { background: var(--theme-primary); color: white; border-bottom-right-radius: 0; }
-.msg-wrap.them .msg-bubble { background: rgba(255,255,255,0.1); color: #f3f4f6; border-bottom-left-radius: 0; }
+.msg-wrap.me .msg-bubble { background: var(--theme-primary); color: white; border-bottom-right-radius: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,0.2); }
+.msg-wrap.them .msg-bubble { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.05); color: #f3f4f6; border-bottom-left-radius: 0; }
+
+/* Grip Handles for Window Sizing Adjustments */
+.window-resize-handle {
+    position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: se-resize;
+    background: linear-gradient(135deg, transparent 45%, rgba(255,255,255,0.2) 50%, transparent 55%, rgba(255,255,255,0.2) 60%);
+    z-index: 40;
+}
+.window-control-action { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 0.9rem; transition: color 0.15s; }
+.window-control-action:hover { color: #ffffff !important; }
