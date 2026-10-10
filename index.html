@@ -3,26 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Updated Title to reflect ElementOS -->
     <title>ElementOS</title>
-    <!-- Tailwind CSS for modern styling -->
+    <!-- Tailwind CSS for modern responsive styling -->
     <script src="https://jsdelivr.net"></script>
-    <!-- Matrix JavaScript SDK -->
-    <script src="https://cloudflare.com"></script>
     <style>
         body { background: url('https://unsplash.com') center/cover; }
     </style>
 </head>
 <body class="h-screen w-screen overflow-hidden font-sans select-none text-white">
 
-    <!-- 1. LOGIN / USER CREATION SCREEN -->
+    <!-- 1. LOGIN SCREEN -->
     <div id="login-screen" class="absolute inset-0 bg-black/70 backdrop-blur-md flex flex-col items-center justify-center z-50">
         <div class="bg-gray-900/80 p-8 rounded-2xl w-96 border border-white/10 shadow-2xl text-center">
             <div class="w-24 h-24 bg-teal-600 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl font-bold shadow-lg">🟢</div>
-            <!-- Updated Heading -->
             <h2 class="text-xl font-semibold mb-6">Sign in to ElementOS</h2>
             <input id="login-homeserver" type="text" value="https://matrix.org" class="w-full bg-white/10 p-3 rounded-lg mb-3 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-teal-500" placeholder="Homeserver">
-            <input id="login-username" type="text" class="w-full bg-white/10 p-3 rounded-lg mb-3 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-teal-500" placeholder="Username (e.g. @alice:matrix.org)">
+            <input id="login-username" type="text" class="w-full bg-white/10 p-3 rounded-lg mb-3 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-teal-500" placeholder="Username (alice)">
             <input id="login-password" type="password" class="w-full bg-white/10 p-3 rounded-lg mb-6 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-teal-500" placeholder="Password">
             <button id="btn-login" class="w-full bg-teal-600 hover:bg-teal-500 py-3 rounded-lg font-medium transition shadow-lg shadow-teal-600/30">Sign In / Connect</button>
         </div>
@@ -44,8 +40,8 @@
         </div>
     </main>
 
-    <!-- 3. CHROMEBOOK-STYLE FANCY FRIENDS PANEL -->
-    <div id="friends-panel" class="hidden absolute bottom-16 right-4 w-80 max-h-[480px] bg-gray-900/90 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col z-40 overflow-hidden transition-all duration-200 transform translate-y-2">
+    <!-- 3. CHROMEBOOK-STYLE FRIENDS PANEL -->
+    <div id="friends-panel" class="hidden absolute bottom-16 right-4 w-80 max-h-[480px] bg-gray-900/90 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col z-40 overflow-hidden transition-all duration-200">
         <div class="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
             <h3 class="font-semibold text-base tracking-wide">Contacts & Friends</h3>
             <button id="btn-show-add-friend" class="w-8 h-8 rounded-full bg-teal-600 hover:bg-teal-500 flex items-center justify-center font-bold text-lg shadow-md transition">+</button>
@@ -63,7 +59,6 @@
             <p class="text-xs text-gray-400 text-center py-8">Loading ElementOS inner circle...</p>
         </div>
 
-        <!-- Add a Logout Button at the bottom of the Friends panel -->
         <div class="p-2 border-t border-white/10 bg-gray-950/20 text-center">
             <button id="btn-logout" class="text-xs text-red-400 hover:text-red-300 transition">Disconnect Account</button>
         </div>
@@ -81,5 +76,7 @@
         </button>
     </footer>
 
+    <!-- App Engine script reference -->
+    <script src="app.js"></script>
 </body>
 </html>

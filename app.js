@@ -1,106 +1,136 @@
-let matrixClient = null;
+let sessionData = null;
 let currentActiveRoomId = null;
+let nextSyncBatchToken = null;
+let roomsCache = {};
 
 function toggleElement(id) {
-    const el = document.getElementById(id);
-    el.classList.toggle('hidden');
+    document.getElementById(id).classList.toggle('hidden');
 }
 
-document.getElementById('taskbar-profile').addEventListener('click', () => {
-    toggleElement('friends-panel');
-});
+document.getElementById('taskbar-profile').addEventListener('click', () => toggleElement('friends-panel'));
+document.getElementById('btn-show-add-friend').addEventListener('click', () => toggleElement('add-friend-ui'));
 
-document.getElementById('btn-show-add-friend').addEventListener('click', () => {
-    toggleElement('add-friend-ui');
-});
-
-// Check if a saved session already exists on load
-window.addEventListener('DOMContentLoaded', async () => {
-    const savedSession = localStorage.getItem('elementos_session');
-    if (savedSession) {
-        const session = JSON.parse(savedSession);
-        initializeClient(session.baseUrl, session.accessToken, session.userId);
+// Automatic session check on page boot
+window.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('elementos_session');
+    if (saved) {
+        sessionData = JSON.parse(saved);
+        enterDesktopMode();
     }
 });
 
-// Login button click handler
+// Native HTTP Matrix Login
 document.getElementById('btn-login').addEventListener('click', async () => {
-    const baseUrl = document.getElementById('login-homeserver').value.trim();
+    let baseUrl = document.getElementById('login-homeserver').value.trim();
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value.trim();
 
-    if(!username || !password) return alert('Please enter login credentials');
+    if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
+    if (!username || !password) return alert('Missing fields!');
 
     try {
-        const tempClient = matrixcs.createClient({ baseUrl });
-        const loginData = await tempClient.login('m.login.password', {
-            user: username,
-            password: password
+        const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
+            method: 'POST',
+            body: JSON.stringify({
+                type: "m.login.password",
+                identifier: { type: "m.id.user", user: username },
+                password: password
+            }),
+            headers: { 'Content-Type': 'application/json' }
         });
 
-        // Save session credentials to keep the user logged in across refreshes
-        localStorage.setItem('elementos_session', JSON.stringify({
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+
+        sessionData = {
             baseUrl: baseUrl,
-            accessToken: loginData.access_token,
-            userId: loginData.user_id
-        }));
+            accessToken: data.access_token,
+            userId: data.user_id
+        };
 
-        initializeClient(baseUrl, loginData.access_token, loginData.user_id);
-
+        localStorage.setItem('elementos_session', JSON.stringify(sessionData));
+        enterDesktopMode();
     } catch (err) {
-        alert('Authentication failed: ' + err.message);
+        alert('Login failed: ' + err.message);
     }
 });
 
-// Setup client session
-async function initializeClient(baseUrl, accessToken, userId) {
-    matrixClient = matrixcs.createClient({ baseUrl, accessToken, userId });
-
-    await matrixClient.startClient({ initialSyncLimit: 20 });
-
-    document.getElementById('user-displayname').textContent = matrixClient.getUserId();
+function enterDesktopMode() {
+    document.getElementById('user-displayname').textContent = sessionData.userId.split(':')[0];
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('desktop').classList.remove('hidden');
-
-    setupMatrixListeners();
+    
+    // Begin background network synchronization loop
+    startSyncLoop();
 }
 
-function setupMatrixListeners() {
-    matrixClient.on("Sync", (state) => {
-        if (state === "PREPARED" || state === "SYNCING") {
-            renderFriendsList();
-        }
-    });
+// Background long polling loop mimicking matrix-js-sdk sync stream
+async function startSyncLoop() {
+    while (sessionData) {
+        let url = `${sessionData.baseUrl}/_matrix/client/v3/sync?timeout=30000`;
+        if (nextSyncBatchToken) url += `&since=${nextSyncBatchToken}`;
 
-    matrixClient.on("Room.timeline", (event, room, toStartOfTimeline) => {
-        if (toStartOfTimeline) return; 
-        if (event.getType() !== "m.room.message") return;
-        if (room.roomId === currentActiveRoomId) {
-            appendMessage(event);
+        try {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${sessionData.accessToken}` }
+            });
+            if (!response.ok) throw new Error();
+            
+            const syncData = await response.json();
+            nextSyncBatchToken = syncData.next_batch;
+            
+            processSyncPayload(syncData);
+        } catch (e) {
+            // Cool down on network drops before re-trying loop
+            await new Promise(r => setTimeout(r, 10000));
         }
-    });
+    }
+}
+
+function processSyncPayload(data) {
+    if (data.rooms && data.rooms.join) {
+        for (const roomId in data.rooms.join) {
+            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], name: roomId };
+            
+            // Extract Timeline Events
+            const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
+            timelineEvents.forEach(ev => {
+                if (ev.type === 'm.room.message') {
+                    roomsCache[roomId].messages.push({
+                        sender: ev.sender,
+                        body: ev.content?.body || ''
+                    });
+                    
+                    // If live chat is focused on this room, inject message immediately
+                    if (roomId === currentActiveRoomId) {
+                        appendLiveMessage(ev.sender, ev.content?.body || '');
+                    }
+                }
+            });
+        }
+        renderFriendsList();
+    }
 }
 
 function renderFriendsList() {
-    const friendsListDiv = document.getElementById('friends-list');
-    const rooms = matrixClient.getRooms();
-    
-    if(rooms.length === 0) {
-        friendsListDiv.innerHTML = `<p class="text-xs text-gray-500 text-center py-8">No friends added yet.</p>`;
+    const listDiv = document.getElementById('friends-list');
+    const roomKeys = Object.keys(roomsCache);
+
+    if (roomKeys.length === 0) {
+        listDiv.innerHTML = `<p class="text-xs text-gray-500 text-center py-8">No active chats found.</p>`;
         return;
     }
 
-    friendsListDiv.innerHTML = '';
-    rooms.forEach(room => {
-        const friendName = room.name || room.roomId;
-        
+    listDiv.innerHTML = '';
+    roomKeys.forEach(roomId => {
+        const shortName = roomId.substring(0, 8);
         const item = document.createElement('div');
         item.className = "flex items-center justify-between p-2.5 hover:bg-white/5 rounded-xl cursor-pointer transition";
         item.innerHTML = `
             <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-gray-700 rounded-full flex items-center justify-center font-bold text-xs uppercase">${friendName.substring(0,2)}</div>
+                <div class="w-9 h-9 bg-teal-800 rounded-full flex items-center justify-center font-bold text-xs">💬</div>
                 <div class="truncate max-w-[130px]">
-                    <p class="text-sm font-medium text-gray-200 truncate">${friendName}</p>
+                    <p class="text-sm font-medium text-gray-200 truncate">${shortName}...</p>
                 </div>
             </div>
             <div class="flex gap-1">
@@ -109,59 +139,57 @@ function renderFriendsList() {
             </div>
         `;
 
-        item.querySelector('.btn-msg').addEventListener('click', (e) => {
-            e.stopPropagation();
-            openChatWindow(room.roomId, friendName);
-        });
-
-        item.querySelector('.btn-call').addEventListener('click', (e) => {
-            e.stopPropagation();
-            alert(`Initiating secure Matrix WebRTC Call to ${friendName}...`);
-        });
-
-        friendsListDiv.appendChild(item);
+        item.querySelector('.btn-msg').addEventListener('click', () => openChatWindow(roomId));
+        item.querySelector('.btn-call').addEventListener('click', () => alert("Webrtc channels initializing..."));
+        listDiv.appendChild(item);
     });
 }
 
+// Room invitation setup
 document.getElementById('btn-add-friend').addEventListener('click', async () => {
     const targetMxid = document.getElementById('friend-mxid').value.trim();
-    if(!targetMxid.startsWith('@')) return alert('Invalid User ID format!');
+    if (!targetMxid.startsWith('@')) return alert('User ID format must be @username:server.com');
 
     try {
-        await matrixClient.createRoom({
-            invite: [targetMxid],
-            preset: 'trusted_private_chat',
-            is_direct: true
+        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, {
+            method: 'POST',
+            body: JSON.stringify({
+                invite: [targetMxid],
+                preset: 'trusted_private_chat',
+                is_direct: true
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${sessionData.accessToken}`
+            }
         });
+        if (!res.ok) throw new Error(await res.text());
         
-        alert('Friend invitation transmitted successfully!');
+        alert('Direct Chat Room successfully established!');
         document.getElementById('friend-mxid').value = '';
         document.getElementById('add-friend-ui').classList.add('hidden');
-        renderFriendsList();
-    } catch(err) {
-        alert('Failed creating connection: ' + err.message);
+    } catch (err) {
+        alert('Failed generating room invite: ' + err.message);
     }
 });
 
-function openChatWindow(roomId, name) {
+function openChatWindow(roomId) {
     currentActiveRoomId = roomId;
-    document.getElementById('chat-title').textContent = `Chatting with ${name}`;
+    document.getElementById('chat-title').textContent = `Room Chat: ${roomId.substring(0, 10)}`;
     document.getElementById('chat-window').classList.remove('hidden');
-    document.getElementById('chat-messages').innerHTML = '';
-
-    const room = matrixClient.getRoom(roomId);
-    if (room && room.timeline) {
-        room.timeline.forEach(event => {
-            if(event.getType() === 'm.room.message') appendMessage(event);
-        });
+    
+    const msgBox = document.getElementById('chat-messages');
+    msgBox.innerHTML = '';
+    
+    // Load local history from sync cache
+    if (roomsCache[roomId]) {
+        roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body));
     }
 }
 
-function appendMessage(event) {
+function appendLiveMessage(sender, body) {
     const container = document.getElementById('chat-messages');
-    const sender = event.getSender();
-    const body = event.getContent().body;
-    const isMe = sender === matrixClient.getUserId();
+    const isMe = sender === sessionData.userId;
 
     const msgHtml = `
         <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
@@ -176,25 +204,29 @@ function appendMessage(event) {
 }
 
 document.getElementById('btn-send').addEventListener('click', sendMessage);
-document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
+document.getElementById('chat-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
 async function sendMessage() {
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
-    if(!text || !currentActiveRoomId) return;
+    if (!text || !currentActiveRoomId) return;
 
     try {
-        await matrixClient.sendMessage(currentActiveRoomId, {
-            msgtype: "m.text",
-            body: text
+        const txnId = Date.now();
+        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ msgtype: "m.text", body: text }),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${sessionData.accessToken}`
+            }
         });
         input.value = '';
-    } catch(err) {
-        alert("Failed sending transmission: " + err.message);
+    } catch (e) {
+        alert('Failed transmission.');
     }
 }
 
-// Logout feature to clear the saved credentials
 document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('elementos_session');
     window.location.reload();
