@@ -32,9 +32,8 @@
             <div class="window-header" id="chat-header">
                 <span id="chat-title" class="window-title">Chat</span>
                 <div class="window-controls-shelf" style="display: flex; align-items: center; gap: 8px;">
-                    <!-- Chrome-style window splitting options -->
-                    <button class="btn-snap-left window-control-action" title="Snap Left" style="font-size:0.75rem; background:none; border:none; color:#9ca3af; cursor:pointer;">◀</button>
-                    <button class="btn-snap-right window-control-action" title="Snap Right" style="font-size:0.75rem; background:none; border:none; color:#9ca3af; cursor:pointer;">▶</button>
+                    <button class="btn-snap-left window-control-action" title="Snap Left">◀</button>
+                    <button class="btn-snap-right window-control-action" title="Snap Right">▶</button>
                     <button id="btn-minimize-chat" class="window-control-action" title="Minimize">—</button>
                     <button id="btn-fullscreen-chat" class="window-control-action" title="Fullscreen">🔲</button>
                     <button id="btn-close-chat" class="window-close">&times;</button>
@@ -45,32 +44,16 @@
                 <input id="chat-input" type="text" placeholder="Type a message..." class="sys-input">
                 <button id="btn-send" class="sys-btn send-sizing">Send</button>
             </div>
-            <!-- Resize handle grip -->
             <div class="window-resize-handle"></div>
         </div>
-        <!-- Floating Resizable Virtual App Runner Iframe Window -->
-        <div id="app-runner-window" class="window flex-column liquid-glass hidden" style="width: 600px; height: 500px; top: 10%; left: 30%;">
-            <div class="window-header" id="app-runner-header">
-                <span id="app-runner-title" class="window-title">Web App</span>
-                <div class="window-controls-shelf" style="display: flex; align-items: center; gap: 8px;">
-                    <button class="btn-snap-left window-control-action" title="Snap Left" style="font-size:0.75rem; background:none; border:none; color:#9ca3af; cursor:pointer;">◀</button>
-                    <button class="btn-snap-right window-control-action" title="Snap Right" style="font-size:0.75rem; background:none; border:none; color:#9ca3af; cursor:pointer;">▶</button>
-                    <button id="btn-close-app" class="window-close" style="margin:0; padding:0;">&times;</button>
-                </div>
-            </div>
-            <div style="flex: 1; width: 100%; height: 100%; background: #fff; overflow: hidden; position: relative;">
-                <!-- Glass overlay prevents mouse tracking loss inside iframes during a drag/resize -->
-                <div class="iframe-drag-shield hidden" style="position: absolute; inset: 0; z-index: 10; background: transparent;"></div>
-                <iframe id="app-runner-iframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
-            </div>
-            <div class="window-resize-handle"></div>
-        </div>
+        <!-- Dynamic Layer for Window Frames -->
+        <div id="app-windows-layer"></div>
 
-        <!-- 🔔 PREMIUM SLIDING SYSTEM TOAST CARD -->
+        <!-- Sliding System Notification Toast -->
         <div id="system-message-toast" class="hidden liquid-glass" style="position: absolute; bottom: 4.5rem; right: 1rem; width: 320px; border-left: 4px solid var(--theme-primary, #0d9488); padding: 1rem; z-index: 100; display: flex; align-items: center; gap: 14px;">
             <div style="font-size: 1.25rem; background: rgba(255,255,255,0.1); width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--theme-primary, #2dd4bf); flex-shrink: 0;">💬</div>
             <div style="display: flex; flex-direction: column; overflow: hidden; flex: 1;">
-                <h5 id="toast-sender-title" style="font-size: 0.8rem; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px;">Sender</h5>
+                <h5 id="toast-sender-title" style="font-size: 0.8rem; font-weight: 600; color: #ffffff; margin-bottom: 1px;">Sender</h5>
                 <p id="toast-message-body" style="font-size: 0.75rem; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;">Preview</p>
             </div>
         </div>
@@ -82,17 +65,17 @@
         </div>
     </main>
 
-    <!-- 3. CHROMEOS-STYLE SPLIT TABBED DRAWER PANEL MENU -->
-    <div id="friends-panel" class="hidden liquid-glass">
+    <!-- 3. REDESIGNED CHROMEOS-STYLE SPLIT TABBED DRAWER PANEL MENU -->
+    <div id="friends-panel" class="hidden liquid-glass-drawer">
         <div class="menu-profile-banner">
             <div id="menu-avatar" class="menu-avatar">E</div>
             <div class="menu-user-details">
                 <p id="menu-displayname" class="menu-username">@user</p>
-                <p class="menu-status-text">ElementOS Premium Architecture</p>
+                <p class="menu-status-text">Premium Core Environment</p>
             </div>
         </div>
 
-        <div style="display: flex; background: rgba(0,0,0,0.15); border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; background: rgba(0,0,0,0.25); margin: 0 1rem; border-radius: 0.75rem; padding: 2px; gap: 2px;">
             <button id="tab-btn-friends" class="menu-tab-trigger active-tab">👥 Friends</button>
             <button id="tab-btn-apps" class="menu-tab-trigger">📱 Apps</button>
             <button id="tab-btn-settings" class="menu-tab-trigger">⚙️ Settings</button>
@@ -115,21 +98,18 @@
             </div>
         </div>
 
-        <div id="tab-content-apps" class="tab-content-panel hidden">
-            <div class="panel-header">
-                <h3>Installed Web Apps</h3>
-                <button id="btn-show-add-app" class="add-btn-circle">+</button>
+        <div id="tab-content-apps" class="tab-content-panel hidden" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto;">
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 1rem; display: flex; flex-direction: column; gap: 8px;">
+                <h4 style="font-size: 0.8rem; font-weight: 600; color: #fff;">Install Custom Web Application</h4>
+                <input id="app-input-name" type="text" placeholder="App Name (e.g. YouTube)" class="sys-input" style="font-size: 0.75rem; padding: 0.5rem; margin: 0;">
+                <input id="app-input-url" type="text" placeholder="URL Web Link (https://...)" class="sys-input" style="font-size: 0.75rem; padding: 0.5rem; margin: 0;">
+                <button id="btn-add-app" class="sys-btn" style="font-size: 0.75rem; padding: 0.5rem; margin-top: 2px; border-radius: 0.5rem;">⚡ Create Shortcut</button>
             </div>
-            <div id="add-app-ui" class="add-friend-box hidden">
-                <input id="app-input-name" type="text" placeholder="App Name (e.g. Google Docs)" class="sys-input add-friend-sizing">
-                <input id="app-input-url" type="text" placeholder="https://google.com..." class="sys-input add-friend-sizing">
-                <div class="flex-container">
-                    <button id="btn-add-app" class="sys-btn add-friend-sizing flex-1">Add App</button>
-                    <button onclick="toggleVisibility('add-app-ui')" class="sys-btn cancel-btn">Cancel</button>
+            <div style="flex: 1; display: flex; flex-direction: column; margin-top: 0.25rem;">
+                <h4 style="font-size: 0.8rem; font-weight: 600; color: #9ca3af; margin-bottom: 0.5rem; padding-left: 0.25rem;">App Drawer Management</h4>
+                <div id="os-apps-list" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1;">
+                    <p class="loading-label">No custom web apps installed.</p>
                 </div>
-            </div>
-            <div id="os-apps-list" class="friend-list-container">
-                <p class="loading-label">No custom web apps installed.</p>
             </div>
         </div>
 
@@ -156,9 +136,8 @@
         <div class="logout-footer"><button id="btn-logout">Disconnect Account</button></div>
     </div>
 
-    <!-- Hidden Local Proxy Upload Slots -->
+    <!-- Hidden Input Proxies for Upload Files Pipelines -->
     <input id="friend-avatar-file-proxy" type="file" accept="image/*" class="hidden">
-    <input id="app-icon-file-proxy" type="file" accept="image/*" class="hidden">
 
     <!-- 4. CHROMBOOK-STYLE SYSTEM SHELF TASKBAR -->
     <footer class="taskbar liquid-glass" style="border-radius: 0; border-bottom: none; border-left: none; border-right: none;">

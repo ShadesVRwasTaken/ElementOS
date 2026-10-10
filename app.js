@@ -9,11 +9,9 @@ let isSyncing = false;
 let customFriendAvatars = JSON.parse(localStorage.getItem('os_friend_avatars') || '{}');
 let osInstalledApps = JSON.parse(localStorage.getItem('os_installed_apps') || '[]');
 let targetAvatarUploadRoomId = null;
-let targetIconUploadAppId = null;
 
-// Window Layout Geometric Context Caching Tracking States
-let isChatFullscreen = false;
-let regularWindowPosition = { top: "15%", left: "15%", width: "420px", height: "500px" };
+// Window Layout geometric context caching states
+let regularWindowPositions = {};
 
 const elementNotificationSound = new Audio('https://mixkit.co');
 
@@ -26,7 +24,6 @@ function toggleVisibility(id) {
 document.getElementById('taskbar-status-tray').addEventListener('click', () => toggleVisibility('friends-panel'));
 document.getElementById('btn-show-add-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
 document.getElementById('btn-cancel-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
-document.getElementById('btn-show-add-app').addEventListener('click', () => toggleVisibility('add-app-ui'));
 
 // Active Hardware Chromebook Battery Synchronization API Component Module
 function initBatterySync() {
@@ -56,7 +53,7 @@ function runSystemClock() {
     updateClock();
     setInterval(updateClock, 15000);
 }
-// Native Drag-and-Resize Interactive Window Processing Engine
+// Advanced Resizable, Draggable, and Chrome Snap-Splitting Window Engine Component
 function initInteractiveOSWindow(winId, headerId) {
     const win = document.getElementById(winId);
     const header = document.getElementById(headerId);
@@ -64,9 +61,11 @@ function initInteractiveOSWindow(winId, headerId) {
     const shield = win.querySelector('.iframe-drag-shield');
     
     let posX = 0, posY = 0, mouseX = 0, mouseY = 0;
+    regularWindowPositions[winId] = { isFullscreen: false, top: "15%", left: "15%", width: "420px", height: "500px" };
 
+    // Draggable Heading Setup
     header.onmousedown = (e) => {
-        if (isChatFullscreen && winId === 'chat-window') return;
+        if (regularWindowPositions[winId].isFullscreen) return;
         if (e.target.closest('.window-controls-shelf')) return;
         e.preventDefault(); if (shield) shield.classList.remove('hidden');
         mouseX = e.clientX; mouseY = e.clientY;
@@ -77,6 +76,7 @@ function initInteractiveOSWindow(winId, headerId) {
         };
     };
 
+    // Resizable Corner Handle Grip Setup
     if (resizeHandle) {
         resizeHandle.onmousedown = (e) => {
             e.preventDefault(); if (shield) shield.classList.remove('hidden');
@@ -88,15 +88,39 @@ function initInteractiveOSWindow(winId, headerId) {
         };
     }
 
+    // Chrome Window Splitter Snap Controls Setup
     const snapLeftBtn = win.querySelector('.btn-snap-left');
     const snapRightBtn = win.querySelector('.btn-snap-right');
     if (snapLeftBtn && snapRightBtn) {
-        snapLeftBtn.addEventListener('click', () => { win.style.top = "0px"; win.style.left = "0px"; win.style.width = "50vw"; win.style.height = "calc(100vh - 3.25rem)"; });
-        snapRightBtn.addEventListener('click', () => { win.style.top = "0px"; win.style.left = "50vw"; win.style.width = "50vw"; win.style.height = "calc(100vh - 3.25rem)"; });
+        snapLeftBtn.addEventListener('click', () => {
+            regularWindowPositions[winId].isFullscreen = false;
+            win.style.top = "0px"; win.style.left = "0px"; win.style.width = "50vw"; win.style.height = "calc(100vh - 3.25rem)";
+        });
+        snapRightBtn.addEventListener('click', () => {
+            regularWindowPositions[winId].isFullscreen = false;
+            win.style.top = "0px"; win.style.left = "50vw"; win.style.width = "50vw"; win.style.height = "calc(100vh - 3.25rem)";
+        });
+    }
+
+    // Fullscreen Toggler Logic Implementation Block
+    const fsBtn = win.querySelector('#btn-fullscreen-chat') || win.querySelector('.btn-fullscreen-app');
+    if (fsBtn) {
+        fsBtn.addEventListener('click', () => {
+            const state = regularWindowPositions[winId];
+            if (!state.isFullscreen) {
+                state.top = win.style.top || "15%"; state.left = win.style.left || "15%";
+                state.width = win.style.width || "420px"; state.height = win.style.height || "500px";
+                win.style.top = "0px"; win.style.left = "0px"; win.style.width = "100vw"; win.style.height = "calc(100vh - 3.25rem)";
+                fsBtn.textContent = "❐"; state.isFullscreen = true;
+            } else {
+                win.style.top = state.top; win.style.left = state.left; win.style.width = state.width; win.style.height = state.height;
+                fsBtn.textContent = "🔲"; state.isFullscreen = false;
+            }
+        });
     }
 }
 
-// Custom Accent and Background Setting Managers
+// Settings Customization Handlers
 function initSystemSettings() {
     const colorPicker = document.getElementById('setting-theme-color');
     const bgUpload = document.getElementById('setting-wallpaper-upload');
@@ -127,22 +151,10 @@ function switchDrawerTab(target) {
         document.getElementById(`tab-content-${t}`).classList.toggle('hidden', t !== target);
     });
 }
-// Window Management Routing Controls
+// Window Management Actions Mapping
 document.getElementById('btn-close-chat').addEventListener('click', () => { document.getElementById('chat-window').classList.add('hidden'); document.getElementById('minimized-dock-indicator').classList.add('hidden'); currentActiveRoomId = null; });
 document.getElementById('btn-minimize-chat').addEventListener('click', () => { document.getElementById('minimized-dock-label').textContent = roomsCache[currentActiveRoomId]?.customName || "Active Chat"; document.getElementById('chat-window').classList.add('hidden'); document.getElementById('minimized-dock-indicator').classList.remove('hidden'); });
 document.getElementById('minimized-dock-indicator').addEventListener('click', () => { document.getElementById('chat-window').classList.remove('hidden'); document.getElementById('minimized-dock-indicator').classList.add('hidden'); });
-
-document.getElementById('btn-fullscreen-chat').addEventListener('click', () => {
-    const win = document.getElementById('chat-window'); const btn = document.getElementById('btn-fullscreen-chat');
-    if (!isChatFullscreen) {
-        regularWindowPosition.top = win.style.top || "15%"; regularWindowPosition.left = win.style.left || "15%"; regularWindowPosition.width = win.style.width || "420px"; regularWindowPosition.height = win.style.height || "500px";
-        win.style.top = "0px"; win.style.left = "0px"; win.style.width = "100vw"; win.style.height = "calc(100vh - 3.25rem)"; btn.textContent = "❐"; isChatFullscreen = true;
-    } else {
-        win.style.top = regularWindowPosition.top; win.style.left = regularWindowPosition.left; win.style.width = regularWindowPosition.width; win.style.height = regularWindowPosition.height; btn.textContent = "🔲"; isChatFullscreen = false;
-    }
-});
-
-document.getElementById('btn-close-app').addEventListener('click', () => { document.getElementById('app-runner-window').classList.add('hidden'); document.getElementById('app-runner-iframe').src = ""; });
 
 function triggerSystemMessageToast(roomId, body) {
     const toast = document.getElementById('system-message-toast');
@@ -155,7 +167,7 @@ function triggerSystemMessageToast(roomId, body) {
 document.getElementById('btn-logout').addEventListener('click', () => { localStorage.removeItem('elementos_session'); window.location.reload(); });
 
 window.addEventListener('load', () => {
-    runSystemClock(); initInteractiveOSWindow('chat-window', 'chat-header'); initInteractiveOSWindow('app-runner-window', 'app-runner-header');
+    runSystemClock(); initInteractiveOSWindow('chat-window', 'chat-header');
     initBatterySync(); initSystemSettings(); renderAppsEcosystem();
     
     document.getElementById('friend-avatar-file-proxy').addEventListener('change', (e) => {
@@ -165,42 +177,29 @@ window.addEventListener('load', () => {
         }
     });
 
-    document.getElementById('app-icon-file-proxy').addEventListener('change', (e) => {
-        const file = e.target.files;
-        if (file && targetIconUploadAppId !== null) {
-            const reader = new FileReader(); reader.onload = (ev) => { osInstalledApps[targetIconUploadAppId].iconImg = ev.target.result; localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps)); renderAppsEcosystem(); }; reader.readAsDataURL(file);
-        }
-    });
-
     const saved = localStorage.getItem('elementos_session'); if (saved) { sessionData = JSON.parse(saved); enterDesktopMode(); }
 });
+
 document.getElementById('btn-login').addEventListener('click', async () => {
-    let baseUrl = document.getElementById('login-homeserver').value.trim(); 
-    let username = document.getElementById('login-username').value.trim(); 
-    const password = document.getElementById('login-password').value.trim();
-    if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl; 
-    if (!username || !password) return alert('Missing fields.');
+    let baseUrl = document.getElementById('login-homeserver').value.trim(); let username = document.getElementById('login-username').value.trim(); const password = document.getElementById('login-password').value.trim();
+    if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl; if (!username || !password) return alert('Missing fields.');
     if (!username.includes(':') && username.startsWith('@')) username = `${username}:${baseUrl.replace('https://','').replace('http://','')}`;
 
     try {
         const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, { method: 'POST', body: JSON.stringify({ type: "m.login.password", identifier: { type: "m.id.user", user: username }, password }), headers: { 'Content-Type': 'application/json' } });
-        if (!response.ok) throw new Error(); 
+        if (!response.ok) throw new Error((await response.json()).error || "Login rejection.");
         const data = await response.json();
-        sessionData = { baseUrl, accessToken: data.access_token, userId: data.user_id }; 
-        localStorage.setItem('elementos_session', JSON.stringify(sessionData)); 
-        enterDesktopMode();
-    } catch (err) { alert('Authentication Error'); }
+        sessionData = { baseUrl, accessToken: data.access_token, userId: data.user_id }; localStorage.setItem('elementos_session', JSON.stringify(sessionData)); enterDesktopMode();
+    } catch (err) { alert('Authentication Error: ' + err.message); }
 });
 
 function enterDesktopMode() {
     if (!sessionData) return;
     document.getElementById('menu-displayname').textContent = sessionData.userId;
     document.getElementById('menu-avatar').textContent = sessionData.userId.replace('@','').substring(0,2).toUpperCase();
-    document.getElementById('login-screen').classList.add('hidden'); 
-    document.getElementById('desktop').classList.remove('hidden');
+    document.getElementById('login-screen').classList.add('hidden'); document.getElementById('desktop').classList.remove('hidden');
     if (!isSyncing) { isSyncing = true; startSyncLoop(); }
 }
-
 async function startSyncLoop() {
     while (sessionData) {
         let url = `${sessionData.baseUrl}/_matrix/client/v3/sync?timeout=30000`; 
@@ -219,14 +218,16 @@ function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
             if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null };
-            data.rooms.join[roomId].state?.events?.forEach(ev => { if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; });
+            data.rooms.join[roomId].state?.events?.forEach(ev => { 
+                if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; 
+            });
             data.rooms.join[roomId].timeline?.events?.forEach(ev => {
                 if (ev.type === 'm.room.message' && ev.content?.body) {
-                    roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body });
+                    roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body, origin_server_ts: ev.origin_server_ts });
                     if (ev.sender !== sessionData.userId && (roomId !== currentActiveRoomId || document.getElementById('chat-window').classList.contains('hidden'))) {
                         triggerSystemMessageToast(roomId, ev.content.body);
                     }
-                    if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body);
+                    if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body, ev.origin_server_ts);
                 }
             });
         }
@@ -277,13 +278,15 @@ document.getElementById('btn-add-app').addEventListener('click', () => {
     let url = urlInput.value.trim();
     if (!name || !url) return alert('Please complete fields.'); 
     if (!url.startsWith('http')) url = 'https://' + url;
-    osInstalledApps.push({ id: Date.now(), name, url, iconImg: null }); 
+    
+    const urlDomain = url.replace('https://','').replace('http://','').split('/')[0];
+    const faviconUrl = `https://google.com{urlDomain}`;
+
+    osInstalledApps.push({ id: "win_" + Date.now(), name, url, iconImg: faviconUrl }); 
     localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps));
     nameInput.value = ''; urlInput.value = ''; 
-    document.getElementById('add-app-ui').classList.add('hidden'); 
     renderAppsEcosystem();
 });
-
 function renderAppsEcosystem() {
     const listDiv = document.getElementById('os-apps-list'); 
     const gridDiv = document.getElementById('desktop-apps-grid');
@@ -295,28 +298,52 @@ function renderAppsEcosystem() {
         item.className = "friend-item";
         item.innerHTML = `
             <div class="friend-meta">
-                <div class="friend-avatar" style="${app.iconImg ? `background-image: url('\${app.iconImg}'); text-indent: -9999px;` : ''}">🌐</div>
+                <div class="friend-avatar" style="background-image: url('${app.iconImg}'); text-indent: -9999px;">🌐</div>
                 <div class="friend-name">${app.name}</div>
             </div>
             <div class="friend-actions-group">
                 <button class="action-icon-btn btn-app-rename">✏️</button>
-                <button class="action-icon-btn btn-app-icon">🖼️</button>
                 <button class="action-icon-btn btn-app-del" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.25);">❌</button>
             </div>`;
         item.querySelector('.btn-app-rename').addEventListener('click', () => { const newName = prompt("Rename:", app.name); if (newName && newName.trim() !== "") { osInstalledApps[index].name = newName.trim(); localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps)); renderAppsEcosystem(); } });
-        item.querySelector('.btn-app-icon').addEventListener('click', () => { targetIconUploadAppId = index; document.getElementById('app-icon-file-proxy').click(); });
         item.querySelector('.btn-app-del').addEventListener('click', () => { if(confirm("Uninstall app?")) { osInstalledApps.splice(index, 1); localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps)); renderAppsEcosystem(); } });
         listDiv.appendChild(item);
 
         const iconNode = document.createElement('div'); 
         iconNode.className = "desktop-shortcut-node";
         iconNode.innerHTML = `
-            <div class="desktop-app-icon" style="${app.iconImg ? `background-image: url('\${app.iconImg}');` : ''}">${app.iconImg ? '' : app.name.substring(0,2).toUpperCase()}</div>
+            <div class="desktop-app-icon" style="background-image: url('${app.iconImg}');"></div>
             <div class="desktop-app-label">${app.name}</div>`;
-        iconNode.addEventListener('dblclick', () => { document.getElementById('app-runner-title').textContent = app.name; document.getElementById('app-runner-iframe').src = app.url; document.getElementById('app-runner-window').classList.remove('hidden'); });
+        
+        iconNode.addEventListener('dblclick', () => {
+            if (document.getElementById(app.id)) return;
+            const container = document.getElementById('app-windows-layer');
+            const winFrame = document.createElement('div');
+            winFrame.id = app.id; winFrame.className = "window glass-panel flex-column liquid-glass";
+            winFrame.style.top = "18%"; winFrame.style.left = "22%"; winFrame.style.width = "640px"; winFrame.style.height = "480px";
+            winFrame.innerHTML = `
+                <div class="window-header" id="head_${app.id}">
+                    <span class="window-title">🚀 ${app.name}</span>
+                    <div class="window-controls-shelf" style="display: flex; align-items: center; gap: 8px;">
+                        <button class="btn-snap-left window-control-action" title="Snap Left">◀</button>
+                        <button class="btn-snap-right window-control-action" title="Snap Right">▶</button>
+                        <button class="btn-fullscreen-app window-control-action" title="Fullscreen">🔲</button>
+                        <button class="window-close" id="close_${app.id}">&times;</button>
+                    </div>
+                </div>
+                <div style="flex:1; width:100%; height:100%; background:#fff; position:relative;">
+                    <div class="iframe-drag-shield hidden" style="position:absolute; inset:0; z-index:10; background:transparent;"></div>
+                    <iframe src="${app.url}" style="width:100%; height:100%; border:none;"></iframe>
+                </div>
+                <div class="window-resize-handle"></div>`;
+            container.appendChild(winFrame);
+            initInteractiveOSWindow(app.id, `head_${app.id}`);
+            document.getElementById(`close_${app.id}`).addEventListener('click', () => winFrame.remove());
+        });
         gridDiv.appendChild(iconNode);
     });
 }
+
 async function leaveFriendRoom(roomId) {
     try {
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/leave`, { method: 'POST', body: JSON.stringify({}), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
@@ -345,15 +372,16 @@ function openChatWindow(roomId) {
     document.getElementById('minimized-dock-indicator').classList.add('hidden');
     const msgBox = document.getElementById('chat-messages'); 
     msgBox.innerHTML = '';
-    if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body));
+    if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body, m.origin_server_ts));
 }
 
-function appendLiveMessage(sender, body) {
+function appendLiveMessage(sender, body, timestamp) {
     const container = document.getElementById('chat-messages'); 
     const isMe = sender === sessionData.userId;
+    const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
-            <span class="msg-sender">${sender.split(':').replace('@','')}</span>
+            <span class="msg-sender">${sender.split(':').replace('@','')} • <span style="opacity:0.6;">${timeStr}</span></span>
             <div class="msg-bubble">${body}</div>
         </div>`;
     container.insertAdjacentHTML('beforeend', msgHtml); 
