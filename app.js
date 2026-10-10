@@ -60,6 +60,7 @@ function runSystemClock() {
     updateClock();
     setInterval(updateClock, 15000);
 }
+
 // Advanced Resizable, Draggable, and Chrome Snap-Splitting Window Engine Component
 function initInteractiveOSWindow(winId, headerId) {
     const win = document.getElementById(winId);
@@ -177,6 +178,18 @@ window.addEventListener('load', () => {
     runSystemClock(); initInteractiveOSWindow('chat-window', 'chat-header');
     initBatterySync(); initSystemSettings(); renderAppsEcosystem();
     
+    const showGroupBtn = document.getElementById('btn-show-create-group');
+    if (showGroupBtn) {
+        showGroupBtn.addEventListener('click', () => {
+            populateGroupMembersCheckboxes();
+            toggleVisibility('create-group-ui');
+        });
+    }
+    const cancelGroupBtn = document.getElementById('btn-cancel-group');
+    if (cancelGroupBtn) {
+        cancelGroupBtn.addEventListener('click', () => toggleVisibility('create-group-ui'));
+    }
+
     document.getElementById('friend-avatar-file-proxy').addEventListener('change', (e) => {
         const file = e.target.files;
         if (file && targetAvatarUploadRoomId) {
@@ -186,7 +199,6 @@ window.addEventListener('load', () => {
 
     const saved = localStorage.getItem('elementos_session'); if (saved) { sessionData = JSON.parse(saved); enterDesktopMode(); }
 });
-
 document.getElementById('btn-login').addEventListener('click', async () => {
     let baseUrl = document.getElementById('login-homeserver').value.trim(); let username = document.getElementById('login-username').value.trim(); const password = document.getElementById('login-password').value.trim();
     if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl; if (!username || !password) return alert('Missing fields.');
@@ -207,6 +219,7 @@ function enterDesktopMode() {
     document.getElementById('login-screen').classList.add('hidden'); document.getElementById('desktop').classList.remove('hidden');
     if (!isSyncing) { isSyncing = true; startSyncLoop(); }
 }
+
 async function startSyncLoop() {
     while (sessionData) {
         let url = `${sessionData.baseUrl}/_matrix/client/v3/sync?timeout=30000`; if (nextSyncBatchToken) url += `&since=${nextSyncBatchToken}`;
@@ -240,6 +253,7 @@ function processSyncPayload(data) {
     }
     renderFriendsList();
 }
+
 function renderFriendsList() {
     const listDiv = document.getElementById('friends-list'); const roomKeys = Object.keys(roomsCache);
     if (roomKeys.length === 0) { listDiv.innerHTML = `<p class="loading-label">No active channels.</p>`; return; }
@@ -272,7 +286,6 @@ function renderFriendsList() {
         listDiv.appendChild(item);
     });
 }
-
 document.getElementById('btn-add-friend').addEventListener('click', async () => {
     let targetMxid = document.getElementById('friend-mxid').value.trim(); if (!targetMxid) return;
     if (!targetMxid.startsWith('@')) { const domain = sessionData.baseUrl.replace('https://','').replace('http://',''); targetMxid = `@${targetMxid}:${domain}`; }
@@ -284,12 +297,31 @@ document.getElementById('btn-add-friend').addEventListener('click', async () => 
     } catch (err) { alert('Friend creation failed.'); }
 });
 
+function populateGroupMembersCheckboxes() {
+    const container = document.getElementById('group-members-checkboxes'); if (registeredFriendHandles.length === 0) { container.innerHTML = `<p style="font-size:0.7rem; color:#9ca3af; text-align:center;">Add isolated friends first to display them here.</p>`; return; }
+    container.innerHTML = '';
+    registeredFriendHandles.forEach(mxid => {
+        const short = mxid.replace('@', '').split(':');
+        const label = document.createElement('label'); label.style.cssText = "display:flex; align-items:center; gap:8px; font-size:0.75rem; color:#e5e7eb; cursor:pointer;";
+        label.innerHTML = `<input type="checkbox" value="${mxid}" style="accent-color:var(--theme-primary);"> <span>${short}</span>`; container.appendChild(label);
+    });
+}
+
+document.getElementById('btn-create-group-submit').addEventListener('click', async () => {
+    const groupName = document.getElementById('group-name-input').value.trim(); const checkedBoxes = document.querySelectorAll('#group-members-checkboxes input:checked');
+    if (!groupName) return alert("Please specify a group title name.");
+    const inviteList = []; checkedBoxes.forEach(box => inviteList.push(box.value)); if (inviteList.length === 0) return alert("Select at least one member profile check field.");
+    try {
+        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ name: groupName, invite: inviteList, preset: 'private_chat', is_direct: false }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
+        const data = await res.json(); roomsCache[data.room_id] = { messages: [], customName: groupName, isGroup: true };
+        document.getElementById('group-name-input').value = ''; document.getElementById('create-group-ui').classList.add('hidden'); renderFriendsList(); alert(`Group room '${groupName}' initialized!`);
+    } catch(err) { alert("Group space formation rejected by server parameters."); }
+});
 document.getElementById('btn-add-app').addEventListener('click', () => {
     const nameInput = document.getElementById('app-input-name'); const urlInput = document.getElementById('app-input-url');
     let name = nameInput.value.trim(); let url = urlInput.value.trim();
     if (!name || !url) return alert('Please complete fields.'); if (!url.startsWith('http')) url = 'https://' + url;
     
-    // FIXED: Generates clean 1-letter or 2-letter uppercase initials text blocks matching your app nickname fields
     const words = name.split(/\s+/).filter(w => w.length > 0);
     let initialText = words.length >= 2 ? (words[0].substring(0,1) + words[1].substring(0,1)) : (words[0] ? words[0].substring(0,1) : 'A');
     initialText = initialText.toUpperCase();
@@ -297,15 +329,13 @@ document.getElementById('btn-add-app').addEventListener('click', () => {
     osInstalledApps.push({ id: "win_" + Date.now(), name, url, initials: initialText }); localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps));
     nameInput.value = ''; urlInput.value = ''; renderAppsEcosystem();
 });
+
 function renderAppsEcosystem() {
-    const listDiv = document.getElementById('os-apps-list'); 
-    const gridDiv = document.getElementById('desktop-apps-grid');
-    gridDiv.innerHTML = ''; 
-    if (osInstalledApps.length === 0) { listDiv.innerHTML = `<p class="loading-label">No custom web apps installed.</p>`; return; }
+    const listDiv = document.getElementById('os-apps-list'); const gridDiv = document.getElementById('desktop-apps-grid');
+    gridDiv.innerHTML = ''; if (osInstalledApps.length === 0) { listDiv.innerHTML = `<p class="loading-label">No custom web apps installed.</p>`; return; }
     listDiv.innerHTML = '';
     osInstalledApps.forEach((app, index) => {
-        const item = document.createElement('div'); 
-        item.className = "friend-item";
+        const item = document.createElement('div'); item.className = "friend-item";
         item.innerHTML = `
             <div class="friend-meta">
                 <div class="friend-avatar" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); font-size:0.75rem; font-weight:bold; color:var(--theme-primary); display:flex; align-items:center; justify-content:center; border-radius:50%; width:32px; height:32px;">${app.initials}</div>
@@ -327,8 +357,7 @@ function renderAppsEcosystem() {
         item.querySelector('.btn-app-del').addEventListener('click', () => { if(confirm("Uninstall app?")) { osInstalledApps.splice(index, 1); localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps)); renderAppsEcosystem(); } });
         listDiv.appendChild(item);
 
-        const iconNode = document.createElement('div'); 
-        iconNode.className = "desktop-shortcut-node";
+        const iconNode = document.createElement('div'); iconNode.className = "desktop-shortcut-node";
         iconNode.innerHTML = `
             <div class="desktop-app-icon" style="background:var(--theme-primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:700; box-shadow:0 8px 16px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.25);">${app.initials}</div>
             <div class="desktop-app-label">${app.name}</div>`;
@@ -354,13 +383,13 @@ function renderAppsEcosystem() {
                     <iframe src="${app.url}" style="width:100%; height:100%; border:none;"></iframe>
                 </div>
                 <div class="window-resize-handle"></div>`;
-            container.appendChild(winFrame); 
-            initInteractiveOSWindow(app.id, `head_${app.id}`);
+            container.appendChild(winFrame); initInteractiveOSWindow(app.id, `head_${app.id}`);
             document.getElementById(`close_${app.id}`).addEventListener('click', () => winFrame.remove());
         });
         gridDiv.appendChild(iconNode);
     });
 }
+
 async function leaveFriendRoom(roomId) {
     try {
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/leave`, { method: 'POST', body: JSON.stringify({}), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
@@ -379,7 +408,7 @@ function openChatWindow(roomId) {
 function appendLiveMessage(sender, body, timestamp) {
     const container = document.getElementById('chat-messages'); const isMe = sender === sessionData.userId;
     const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    const cleanSender = sender.replace('@', '').split(':')[0];
+    const cleanSender = sender.replace('@', '').split(':');
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
             <span class="msg-sender">${cleanSender} • <span style="opacity:0.6;">${timeStr}</span></span>
