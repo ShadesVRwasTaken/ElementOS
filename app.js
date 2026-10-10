@@ -8,7 +8,9 @@ let isSyncing = false;
 // Window Layout Geometric Context Cache Tracking States
 let isChatFullscreen = false;
 let regularWindowPosition = { top: "15%", left: "15%", width: "420px", height: "500px" };
-let currentActiveCallId = null; 
+
+// Global browser notification sound file reference
+const elementNotificationSound = new Audio('https://mixkit.co');
 
 function toggleVisibility(id) {
     const el = document.getElementById(id);
@@ -68,11 +70,10 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('elementos_session');
     window.location.reload();
 });
-// New Native Window Utility Actions Component Modules
+// Native Window Utility Actions Component Modules
 document.getElementById('btn-close-chat').addEventListener('click', () => {
     document.getElementById('chat-window').classList.add('hidden');
     document.getElementById('minimized-dock-indicator').classList.add('hidden');
-    document.getElementById('call-selection-dropdown').classList.add('hidden');
     currentActiveRoomId = null;
 });
 
@@ -83,7 +84,6 @@ document.getElementById('btn-minimize-chat').addEventListener('click', () => {
     document.getElementById('minimized-dock-label').textContent = displayTitle;
     document.getElementById('chat-window').classList.add('hidden');
     document.getElementById('minimized-dock-indicator').classList.remove('hidden');
-    document.getElementById('call-selection-dropdown').classList.add('hidden');
 });
 
 document.getElementById('minimized-dock-indicator').addEventListener('click', () => {
@@ -117,61 +117,27 @@ document.getElementById('btn-fullscreen-chat').addEventListener('click', () => {
     }
 });
 
-document.getElementById('btn-call-menu').addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleVisibility('call-selection-dropdown');
-});
-
-document.addEventListener('click', () => {
-    document.getElementById('call-selection-dropdown').classList.add('hidden');
-});
-
-// Outbound Signaling Core Event Transmissions
-document.getElementById('btn-audio-call').addEventListener('click', () => startMatrixCall("voice"));
-document.getElementById('btn-video-call').addEventListener('click', () => startMatrixCall("video"));
-
-async function startMatrixCall(type) {
-    if (!currentActiveRoomId) return;
-    const callId = "c" + Date.now();
+// Chromebook Status Center Sliding Toast Alert System
+function triggerSystemMessageToast(sender, body) {
+    const toast = document.getElementById('system-message-toast');
+    const cleanSender = sender.split(':')[0].replace('@', '');
     
+    document.getElementById('toast-sender-title').textContent = `Message from ${cleanSender}`;
+    document.getElementById('toast-message-body').textContent = body;
+    
+    // Play sound element cleanly
     try {
-        const txnId = "t" + Date.now();
-        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.call.invite/${txnId}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-                call_id: callId,
-                version: "1",
-                lifetime: 60000,
-                offer: { type: "offer", sdp: "m=audio..." },
-                type: type
-            }),
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
-        });
-        alert(`Outgoing Matrix ${type === "voice" ? "Audio" : "Video"} call invitation broadcasted!`);
-    } catch (e) {
-        console.log("Call placement failed.");
-    }
+        elementNotificationSound.currentTime = 0;
+        elementNotificationSound.play();
+    } catch(err) { console.log("Sound interaction delayed."); }
+
+    toast.classList.remove('hidden');
+    
+    // Auto-hide toast after a 4-second timeout interval
+    setTimeout(() => {
+        toast.classList.add('hidden');
+    }, 4000);
 }
-
-// Inbound Signaling Action Listeners
-document.getElementById('btn-call-answer').addEventListener('click', async () => {
-    if (!currentActiveCallId || !currentActiveRoomId) return;
-    try {
-        const txnId = "t" + Date.now();
-        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.call.answer/${txnId}`, {
-            method: 'PUT',
-            body: JSON.stringify({ call_id: currentActiveCallId, version: "1", answer: { type: "answer", sdp: "m=audio..." } }),
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
-        });
-        document.getElementById('system-incoming-call-alert').classList.add('hidden');
-        alert("Call connected! Channels bridging securely.");
-    } catch(e) {}
-});
-
-document.getElementById('btn-call-decline').addEventListener('click', () => {
-    document.getElementById('system-incoming-call-alert').classList.add('hidden');
-    currentActiveCallId = null;
-});
 
 // Primary System Core Lifecycle Initializer Entry Sequence Hook
 window.addEventListener('load', () => {
@@ -220,7 +186,6 @@ document.getElementById('btn-login').addEventListener('click', async () => {
         enterDesktopMode();
     } catch (err) { alert('Authentication Error: ' + err.message); }
 });
-// FIXED: Extracted user label strictly on String operations to prevent array crash faults
 function enterDesktopMode() {
     if (!sessionData) return;
     const shortUser = sessionData.userId.replace('@', '').split(':')[0];
@@ -254,23 +219,22 @@ async function startSyncLoop() {
 function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
+            // Setup cache structural maps securely
             if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null, isDirect: false };
             data.account_data?.events?.forEach(ev => { if (ev.type === "m.direct") roomsCache[roomId].isDirect = true; });
             data.rooms.join[roomId].state?.events?.forEach(ev => { if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; });
             
             const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
             timelineEvents.forEach(ev => {
-                if (ev.type === "m.call.invite" && ev.sender !== sessionData.userId) {
-                    currentActiveCallId = ev.content.call_id;
-                    currentActiveRoomId = roomId;
-                    document.getElementById('incoming-call-caller').textContent = ev.sender;
-                    document.getElementById('system-incoming-call-alert').classList.remove('hidden');
-                }
-                if (ev.type === "m.call.answer" && ev.sender !== sessionData.userId) {
-                    alert("Your placed call has been answered on the other end!");
-                }
+                // FIXED: Event parsing aligned explicitly on m.room.message type actions
                 if (ev.type === 'm.room.message' && ev.content?.body) {
                     roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body });
+                    
+                    // Inbound trigger: If the message arrived while window is closed or unfocused, fire audio/toast notifications
+                    if (ev.sender !== sessionData.userId && (roomId !== currentActiveRoomId || document.getElementById('chat-window').classList.contains('hidden'))) {
+                        triggerSystemMessageToast(ev.sender, ev.content.body);
+                    }
+
                     if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body);
                 }
             });
@@ -346,7 +310,6 @@ function openChatWindow(roomId) {
     document.getElementById('chat-title').textContent = `Chatting with: ${room.customName || roomId.substring(0, 10)}`;
     document.getElementById('chat-window').classList.remove('hidden');
     document.getElementById('minimized-dock-indicator').classList.add('hidden');
-    document.getElementById('call-selection-dropdown').classList.add('hidden');
     const msgBox = document.getElementById('chat-messages');
     msgBox.innerHTML = '';
     if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body));
@@ -355,7 +318,7 @@ function openChatWindow(roomId) {
 function appendLiveMessage(sender, body) {
     const container = document.getElementById('chat-messages');
     const isMe = sender === sessionData.userId;
-    const cleanSender = sender.split(':').replace('@', '');
+    const cleanSender = sender.split(':')[0].replace('@', '');
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
             <span class="msg-sender">${cleanSender}</span>
@@ -374,6 +337,7 @@ async function sendMessage() {
     if (!text || !currentActiveRoomId) return;
     try {
         const txnId = Date.now();
+        // FIXED: Re-aligned event body schema back to strict m.room.message type parameters
         await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, { method: 'PUT', body: JSON.stringify({ msgtype: "m.text", body: text }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         input.value = '';
     } catch (e) { console.log("Send failed."); }

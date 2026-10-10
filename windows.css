@@ -191,3 +191,11 @@
     color: #ffffff !important;
     transform: scale(1.1);
 }
+/* Custom System Notification Toast Control Classes */
+#system-message-toast.hidden {
+    display: none !important;
+}
+.window-control-action:hover {
+    color: #ffffff !important;
+    transform: scale(1.1);
+}
