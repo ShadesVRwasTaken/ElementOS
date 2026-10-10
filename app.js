@@ -89,14 +89,15 @@ function makeWindowDraggable() {
 function initSystemSettings() {
     const colorPicker = document.getElementById('setting-theme-color');
     const bgUpload = document.getElementById('setting-wallpaper-upload');
+    const defaultWallpaper = 'https://unsplash.com';
 
     // Load cached preferences safely
     const savedColor = localStorage.getItem('os_theme_color') || '#0d9488';
     colorPicker.value = savedColor;
     document.documentElement.style.setProperty('--theme-primary', savedColor);
 
-    const savedBg = localStorage.getItem('os_desktop_bg');
-    if (savedBg) document.body.style.backgroundImage = `url('${savedBg}')`;
+    const savedBg = localStorage.getItem('os_desktop_bg') || defaultWallpaper;
+    document.body.style.backgroundImage = `url('${savedBg}')`;
 
     // Bind setting adjustments listeners
     colorPicker.addEventListener('input', (e) => {
@@ -118,6 +119,18 @@ function initSystemSettings() {
         }
     });
 
+    // Native Settings Workspace Reset Actions
+    document.getElementById('btn-reset-color').addEventListener('click', () => {
+        colorPicker.value = '#0d9488';
+        document.documentElement.style.setProperty('--theme-primary', '#0d9488');
+        localStorage.setItem('os_theme_color', '#0d9488');
+    });
+
+    document.getElementById('btn-reset-wallpaper').addEventListener('click', () => {
+        document.body.style.backgroundImage = `url('${defaultWallpaper}')`;
+        localStorage.setItem('os_desktop_bg', defaultWallpaper);
+    });
+
     // Handle Split Layout Menu Tab Toggling
     document.getElementById('tab-btn-friends').addEventListener('click', () => switchDrawerTab('friends'));
     document.getElementById('tab-btn-settings').addEventListener('click', () => switchDrawerTab('settings'));
@@ -130,15 +143,11 @@ function switchDrawerTab(target) {
     const contentSettings = document.getElementById('tab-content-settings');
 
     if (target === 'friends') {
-        tabFriends.classList.add('active-tab');
-        tabSettings.classList.remove('active-tab');
-        contentFriends.classList.remove('hidden');
-        contentSettings.classList.add('hidden');
+        tabFriends.classList.add('active-tab'); tabSettings.classList.remove('active-tab');
+        contentFriends.classList.remove('hidden'); contentSettings.classList.add('hidden');
     } else {
-        tabSettings.classList.add('active-tab');
-        tabFriends.classList.remove('active-tab');
-        contentSettings.classList.remove('hidden');
-        contentFriends.classList.add('hidden');
+        tabSettings.classList.add('active-tab'); tabFriends.classList.remove('active-tab');
+        contentSettings.classList.remove('hidden'); contentFriends.classList.add('hidden');
     }
 }
 
@@ -175,9 +184,13 @@ document.getElementById('btn-fullscreen-chat').addEventListener('click', () => {
     }
 });
 
-function triggerSystemMessageToast(sender, body) {
+// FIXED: Resolves notification username tag strings using active local custom nicknames
+function triggerSystemMessageToast(roomId, body) {
     const toast = document.getElementById('system-message-toast');
-    document.getElementById('toast-sender-title').textContent = `Message from ${sender.split(':')[0].replace('@', '')}`;
+    const room = roomsCache[roomId];
+    let displayTitle = room?.customName || "Friend Chat";
+    
+    document.getElementById('toast-sender-title').textContent = `Message from ${displayTitle}`;
     document.getElementById('toast-message-body').textContent = body;
     try { elementNotificationSound.currentTime = 0; elementNotificationSound.play(); } catch(e){}
     toast.classList.remove('hidden');
@@ -260,7 +273,7 @@ function processSyncPayload(data) {
                 if (ev.type === 'm.room.message' && ev.content?.body) {
                     roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body });
                     if (ev.sender !== sessionData.userId && (roomId !== currentActiveRoomId || document.getElementById('chat-window').classList.contains('hidden'))) {
-                        triggerSystemMessageToast(ev.sender, ev.content.body);
+                        triggerSystemMessageToast(roomId, ev.content.body);
                     }
                     if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body);
                 }
@@ -270,7 +283,6 @@ function processSyncPayload(data) {
     if (data.rooms && data.rooms.leave) data.rooms.leave.forEach(roomId => { delete roomsCache[roomId]; if(currentActiveRoomId===roomId){document.getElementById('chat-window').classList.add('hidden');currentActiveRoomId=null;} });
     renderFriendsList();
 }
-
 function renderFriendsList() {
     const listDiv = document.getElementById('friends-list');
     const roomKeys = Object.keys(roomsCache);
@@ -285,19 +297,33 @@ function renderFriendsList() {
         item.className = "friend-item";
         item.innerHTML = `
             <div class="friend-meta">
-                <div class="friend-avatar" style="${savedAvatar ? `background-image: url('\${savedAvatar}'); text-indent: -9999px;` : ''}">👤</div>
+                <div class="friend-avatar">👤</div>
                 <div class="friend-name" title="${roomId}">${displayLabel}</div>
             </div>
             <div class="friend-actions-group">
                 <button class="action-icon-btn btn-chat">Chat</button>
+                <button class="action-icon-btn btn-rename">✏️</button>
                 <button class="action-icon-btn btn-avatar-up" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.25);">🖼️</button>
                 <button class="action-icon-btn btn-leave" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.25);">❌</button>
             </div>`;
 
+        if (savedAvatar) {
+            const avatarEl = item.querySelector('.friend-avatar');
+            avatarEl.style.backgroundImage = `url('${savedAvatar}')`;
+            avatarEl.style.textIndent = '-9999px';
+        }
+
         item.querySelector('.btn-chat').addEventListener('click', () => openChatWindow(roomId));
         item.querySelector('.btn-leave').addEventListener('click', () => { if(confirm("Delete friend DM?")) leaveFriendRoom(roomId); });
         
-        // Custom avatar file injection proxy event bind
+        item.querySelector('.btn-rename').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const newName = prompt("Enter a nickname for this friend:", room.customName || displayLabel);
+            if (newName && newName.trim() !== "") {
+                renameFriendRoom(roomId, newName.trim());
+            }
+        });
+
         item.querySelector('.btn-avatar-up').addEventListener('click', (e) => {
             e.stopPropagation();
             targetAvatarUploadRoomId = roomId;
@@ -306,6 +332,16 @@ function renderFriendsList() {
 
         listDiv.appendChild(item);
     });
+}
+
+async function renameFriendRoom(roomId, newName) {
+    try {
+        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.name/`, { method: 'PUT', body: JSON.stringify({ name: newName }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
+        if (res.ok) {
+            roomsCache[roomId].customName = newName;
+            renderFriendsList();
+        }
+    } catch(e) {}
 }
 
 async function leaveFriendRoom(roomId) {
