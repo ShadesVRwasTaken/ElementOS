@@ -1,32 +1,96 @@
+// Global System Environment Channels
 let sessionData = null;
 let currentActiveRoomId = null;
 let nextSyncBatchToken = null;
 let roomsCache = {};
+let isSyncing = false;
 
-function toggleElement(id) {
-    document.getElementById(id).classList.toggle('hidden');
+// Universal Visibility Menu Toggle
+function toggleVisibility(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden');
 }
 
-document.getElementById('taskbar-profile').addEventListener('click', () => toggleElement('friends-panel'));
-document.getElementById('btn-show-add-friend').addEventListener('click', () => toggleElement('add-friend-ui'));
-
-// Automatic session check on page boot
-window.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('elementos_session');
-    if (saved) {
-        sessionData = JSON.parse(saved);
-        enterDesktopMode();
-    }
+// Bind System Shelf Tray Interface Click Handlers
+document.getElementById('taskbar-status-tray').addEventListener('click', () => toggleVisibility('friends-panel'));
+document.getElementById('btn-show-add-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
+document.getElementById('btn-cancel-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
+document.getElementById('btn-close-chat').addEventListener('click', () => {
+    document.getElementById('chat-window').classList.add('hidden');
+    currentActiveRoomId = null;
 });
 
-// Native HTTP Matrix Login
+// Chromebook Real-Time Live Clock Component Engine
+function runSystemClock() {
+    const timeEl = document.getElementById('tray-time');
+    const dateEl = document.getElementById('tray-date');
+    
+    function updateClock() {
+        const now = new Date();
+        timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        dateEl.textContent = now.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+    
+    updateClock();
+    setInterval(updateClock, 15000); // Check ticks
+}
+
+// Desktop Draggable Window Component Engine
+function makeWindowDraggable() {
+    const win = document.getElementById('chat-window');
+    const header = document.getElementById('chat-header');
+    let posX = 0, posY = 0, mouseX = 0, mouseY = 0;
+
+    header.onmousedown = (e) => {
+        e.preventDefault();
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        document.onmouseup = () => {
+            document.onmouseup = null;
+            document.onmousemove = null;
+        };
+        document.onmousemove = (ev) => {
+            ev.preventDefault();
+            posX = mouseX - ev.clientX;
+            posY = mouseY - ev.clientY;
+            mouseX = ev.clientX;
+            mouseY = ev.clientY;
+            win.style.top = (win.offsetTop - posY) + "px";
+            win.style.left = (win.offsetLeft - posX) + "px";
+        };
+    };
+}
+
+// System Disconnect Operation Handler
+document.getElementById('btn-logout').addEventListener('click', () => {
+    localStorage.removeItem('elementos_session');
+    window.location.reload();
+});
+
+// Primary System Core Lifecycle Initializer
+window.addEventListener('load', () => {
+    runSystemClock();
+    makeWindowDraggable();
+    document.getElementById('chat-window').classList.add('hidden');
+    
+    try {
+        const saved = localStorage.getItem('elementos_session');
+        if (saved) {
+            sessionData = JSON.parse(saved);
+            enterDesktopMode();
+        }
+    } catch (err) {
+        console.log("Cached access token handshake omitted.");
+    }
+});
+// Native HTTP REST Authentication Protocol
 document.getElementById('btn-login').addEventListener('click', async () => {
     let baseUrl = document.getElementById('login-homeserver').value.trim();
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value.trim();
 
     if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
-    if (!username || !password) return alert('Missing fields!');
+    if (!username || !password) return alert('Please enter all system credentials.');
 
     try {
         const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
@@ -39,32 +103,33 @@ document.getElementById('btn-login').addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json' }
         });
 
-        if (!response.ok) throw new Error(await response.text());
+        if (!response.ok) throw new Error("Incorrect parameters or server connection rejected.");
         const data = await response.json();
 
-        sessionData = {
-            baseUrl: baseUrl,
-            accessToken: data.access_token,
-            userId: data.user_id
-        };
-
+        sessionData = { baseUrl, accessToken: data.access_token, userId: data.user_id };
         localStorage.setItem('elementos_session', JSON.stringify(sessionData));
         enterDesktopMode();
     } catch (err) {
-        alert('Login failed: ' + err.message);
+        alert('Authentication Error: ' + err.message);
     }
 });
 
 function enterDesktopMode() {
-    document.getElementById('user-displayname').textContent = sessionData.userId.split(':')[0];
+    if (!sessionData) return;
+    const shortUser = sessionData.userId.split(':')[0].replace('@', '');
+    
+    document.getElementById('menu-displayname').textContent = sessionData.userId;
+    document.getElementById('menu-avatar').textContent = shortUser.substring(0, 2).toUpperCase();
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('desktop').classList.remove('hidden');
     
-    // Begin background network synchronization loop
-    startSyncLoop();
+    if (!isSyncing) {
+        isSyncing = true;
+        startSyncLoop();
+    }
 }
 
-// Background long polling loop mimicking matrix-js-sdk sync stream
+// Continuous Native HTTP matrix event long polling background pipeline
 async function startSyncLoop() {
     while (sessionData) {
         let url = `${sessionData.baseUrl}/_matrix/client/v3/sync?timeout=30000`;
@@ -75,36 +140,25 @@ async function startSyncLoop() {
                 headers: { 'Authorization': `Bearer ${sessionData.accessToken}` }
             });
             if (!response.ok) throw new Error();
-            
             const syncData = await response.json();
             nextSyncBatchToken = syncData.next_batch;
-            
             processSyncPayload(syncData);
         } catch (e) {
-            // Cool down on network drops before re-trying loop
-            await new Promise(r => setTimeout(r, 10000));
+            await new Promise(r => setTimeout(r, 6000));
         }
     }
+    isSyncing = false;
 }
 
 function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
-            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], name: roomId };
-            
-            // Extract Timeline Events
+            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [] };
             const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
             timelineEvents.forEach(ev => {
-                if (ev.type === 'm.room.message') {
-                    roomsCache[roomId].messages.push({
-                        sender: ev.sender,
-                        body: ev.content?.body || ''
-                    });
-                    
-                    // If live chat is focused on this room, inject message immediately
-                    if (roomId === currentActiveRoomId) {
-                        appendLiveMessage(ev.sender, ev.content?.body || '');
-                    }
+                if (ev.type === 'm.room.message' && ev.content?.body) {
+                    roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body });
+                    if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body);
                 }
             });
         }
@@ -115,73 +169,53 @@ function processSyncPayload(data) {
 function renderFriendsList() {
     const listDiv = document.getElementById('friends-list');
     const roomKeys = Object.keys(roomsCache);
-
     if (roomKeys.length === 0) {
-        listDiv.innerHTML = `<p class="text-xs text-gray-500 text-center py-8">No active chats found.</p>`;
+        listDiv.innerHTML = `<p class="loading-label">No active friend channels.</p>`;
         return;
     }
-
     listDiv.innerHTML = '';
     roomKeys.forEach(roomId => {
-        const shortName = roomId.substring(0, 8);
+        const displayLabel = roomId.length > 20 ? roomId.substring(0, 16) + '...' : roomId;
         const item = document.createElement('div');
-        item.className = "flex items-center justify-between p-2.5 hover:bg-white/5 rounded-xl cursor-pointer transition";
+        item.className = "friend-item";
         item.innerHTML = `
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-teal-800 rounded-full flex items-center justify-center font-bold text-xs">💬</div>
-                <div class="truncate max-w-[130px]">
-                    <p class="text-sm font-medium text-gray-200 truncate">${shortName}...</p>
-                </div>
+            <div class="friend-meta">
+                <div class="friend-avatar">👤</div>
+                <div class="friend-name" title="${roomId}">${displayLabel}</div>
             </div>
-            <div class="flex gap-1">
-                <button class="btn-msg p-1.5 hover:bg-white/10 rounded-lg text-teal-400 text-xs">💬</button>
-                <button class="btn-call p-1.5 hover:bg-white/10 rounded-lg text-emerald-400 text-xs">📞</button>
-            </div>
-        `;
-
-        item.querySelector('.btn-msg').addEventListener('click', () => openChatWindow(roomId));
-        item.querySelector('.btn-call').addEventListener('click', () => alert("Webrtc channels initializing..."));
+            <div class="friend-actions-group"><button class="action-icon-btn">Chat</button></div>`;
+        item.querySelector('.action-icon-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            openChatWindow(roomId);
+        });
         listDiv.appendChild(item);
     });
 }
 
-// Room invitation setup
 document.getElementById('btn-add-friend').addEventListener('click', async () => {
     const targetMxid = document.getElementById('friend-mxid').value.trim();
-    if (!targetMxid.startsWith('@')) return alert('User ID format must be @username:server.com');
-
+    if (!targetMxid.startsWith('@')) return alert('User handle format: @user:server.com');
     try {
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, {
             method: 'POST',
-            body: JSON.stringify({
-                invite: [targetMxid],
-                preset: 'trusted_private_chat',
-                is_direct: true
-            }),
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${sessionData.accessToken}`
-            }
+            body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }),
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
         });
-        if (!res.ok) throw new Error(await res.text());
-        
-        alert('Direct Chat Room successfully established!');
+        if (!res.ok) throw new Error();
+        alert('Friend connection established! Waiting for system update.');
         document.getElementById('friend-mxid').value = '';
         document.getElementById('add-friend-ui').classList.add('hidden');
     } catch (err) {
-        alert('Failed generating room invite: ' + err.message);
+        alert('Channel creation failed or server blocked standard request.');
     }
 });
 
 function openChatWindow(roomId) {
     currentActiveRoomId = roomId;
-    document.getElementById('chat-title').textContent = `Room Chat: ${roomId.substring(0, 10)}`;
+    document.getElementById('chat-title').textContent = `Room Channel: ${roomId.substring(0, 14)}...`;
     document.getElementById('chat-window').classList.remove('hidden');
-    
     const msgBox = document.getElementById('chat-messages');
     msgBox.innerHTML = '';
-    
-    // Load local history from sync cache
     if (roomsCache[roomId]) {
         roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body));
     }
@@ -190,15 +224,12 @@ function openChatWindow(roomId) {
 function appendLiveMessage(sender, body) {
     const container = document.getElementById('chat-messages');
     const isMe = sender === sessionData.userId;
-
+    const cleanSender = sender.split(':')[0].replace('@', '');
     const msgHtml = `
-        <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
-            <span class="text-[10px] text-gray-500 mb-0.5">${sender.split(':')[0]}</span>
-            <div class="${isMe ? 'bg-teal-600 text-white rounded-l-xl rounded-tr-xl' : 'bg-white/10 text-gray-100 rounded-r-xl rounded-tl-xl'} px-3 py-2 max-w-[85%] break-words">
-                ${body}
-            </div>
-        </div>
-    `;
+        <div class="msg-wrap ${isMe ? 'me' : 'them'}">
+            <span class="msg-sender">${cleanSender}</span>
+            <div class="msg-bubble">${body}</div>
+        </div>`;
     container.insertAdjacentHTML('beforeend', msgHtml);
     container.scrollTop = container.scrollHeight;
 }
@@ -210,24 +241,15 @@ async function sendMessage() {
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
     if (!text || !currentActiveRoomId) return;
-
     try {
         const txnId = Date.now();
         await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, {
             method: 'PUT',
             body: JSON.stringify({ msgtype: "m.text", body: text }),
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${sessionData.accessToken}`
-            }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
         });
         input.value = '';
     } catch (e) {
-        alert('Failed transmission.');
+        console.log("Transmission failed.");
     }
 }
-
-document.getElementById('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('elementos_session');
-    window.location.reload();
-});
