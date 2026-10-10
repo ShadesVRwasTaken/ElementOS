@@ -182,3 +182,12 @@
 .msg-bubble { padding: 0.5rem 0.75rem; border-radius: 0.75rem; max-width: 80%; font-size: 0.85rem; word-break: break-word; }
 .msg-wrap.me .msg-bubble { background: #0d9488; color: white; border-bottom-right-radius: 0; }
 .msg-wrap.them .msg-bubble { background: rgba(255,255,255,0.1); color: #f3f4f6; border-bottom-left-radius: 0; }
+/* Custom Utility Menu Styles for Chat Features */
+#call-selection-dropdown button:hover {
+    background: rgba(13, 148, 136, 0.2) !important;
+    color: #2dd4bf !important;
+}
+.window-control-action:hover {
+    color: #ffffff !important;
+    transform: scale(1.1);
+}

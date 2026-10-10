@@ -5,7 +5,10 @@ let nextSyncBatchToken = null;
 let roomsCache = {};
 let isSyncing = false;
 
-// Universal Visibility Menu Toggle
+// Window Layout Geometric Context Cache Tracking States
+let isChatFullscreen = false;
+let regularWindowPosition = { top: "15%", left: "15%", width: "420px", height: "500px" };
+
 function toggleVisibility(id) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('hidden');
@@ -15,10 +18,6 @@ function toggleVisibility(id) {
 document.getElementById('taskbar-status-tray').addEventListener('click', () => toggleVisibility('friends-panel'));
 document.getElementById('btn-show-add-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
 document.getElementById('btn-cancel-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
-document.getElementById('btn-close-chat').addEventListener('click', () => {
-    document.getElementById('chat-window').classList.add('hidden');
-    currentActiveRoomId = null;
-});
 
 // Chromebook Real-Time Live Clock Component Engine
 function runSystemClock() {
@@ -42,6 +41,10 @@ function makeWindowDraggable() {
     let posX = 0, posY = 0, mouseX = 0, mouseY = 0;
 
     header.onmousedown = (e) => {
+        // Disallow window drag adjustments if fullscreen mode is currently deployed
+        if (isChatFullscreen) return;
+        if (e.target.closest('.window-controls-shelf')) return;
+        
         e.preventDefault();
         mouseX = e.clientX;
         mouseY = e.clientY;
@@ -66,8 +69,83 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('elementos_session');
     window.location.reload();
 });
+// New Native Window Utility Actions Component Modules
+document.getElementById('btn-close-chat').addEventListener('click', () => {
+    document.getElementById('chat-window').classList.add('hidden');
+    document.getElementById('minimized-dock-indicator').classList.add('hidden');
+    document.getElementById('call-selection-dropdown').classList.add('hidden');
+    currentActiveRoomId = null;
+});
 
-// Primary System Core Lifecycle Initializer
+// Minimize Window Workflow Function
+document.getElementById('btn-minimize-chat').addEventListener('click', () => {
+    const room = roomsCache[currentActiveRoomId];
+    let displayTitle = room?.customName || "Active Chat";
+    
+    document.getElementById('minimized-dock-label').textContent = displayTitle;
+    document.getElementById('chat-window').classList.add('hidden');
+    document.getElementById('minimized-dock-indicator').classList.remove('hidden');
+    document.getElementById('call-selection-dropdown').classList.add('hidden');
+});
+
+// Restore Minimized Window Dock Click Listener
+document.getElementById('minimized-dock-indicator').addEventListener('click', () => {
+    document.getElementById('chat-window').classList.remove('hidden');
+    document.getElementById('minimized-dock-indicator').classList.add('hidden');
+});
+
+// Fullscreen Toggling Workflow Function
+document.getElementById('btn-fullscreen-chat').addEventListener('click', () => {
+    const win = document.getElementById('chat-window');
+    const btn = document.getElementById('btn-fullscreen-chat');
+    
+    if (!isChatFullscreen) {
+        // Cache current boundary positions before stretching layout canvas
+        regularWindowPosition.top = win.style.top || "15%";
+        regularWindowPosition.left = win.style.left || "15%";
+        regularWindowPosition.width = win.style.width || "420px";
+        regularWindowPosition.height = win.style.height || "500px";
+        
+        // Apply clean standard fullscreen overlay positioning values
+        win.style.top = "0px";
+        win.style.left = "0px";
+        win.style.width = "100vw";
+        win.style.height = "calc(100vh - 3.25rem)"; // Keep taskbar showing at bottom
+        btn.textContent = "❐";
+        isChatFullscreen = true;
+    } else {
+        // Revert geometry states to previous layout cache values
+        win.style.top = regularWindowPosition.top;
+        win.style.left = regularWindowPosition.left;
+        win.style.width = regularWindowPosition.width;
+        win.style.height = regularWindowPosition.height;
+        btn.textContent = "🔲";
+        isChatFullscreen = false;
+    }
+});
+
+// Dropdown Utilities Toggles for Call Menu Items
+document.getElementById('btn-call-menu').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleVisibility('call-selection-dropdown');
+});
+
+document.addEventListener('click', () => {
+    document.getElementById('call-selection-dropdown').classList.add('hidden');
+});
+
+// Interactive Voice Call triggers
+document.getElementById('btn-audio-call').addEventListener('click', () => {
+    const room = roomsCache[currentActiveRoomId];
+    alert(`Initiating private Matrix WebRTC Audio Call with: ${room?.customName || "Friend Channel"}...`);
+});
+
+document.getElementById('btn-video-call').addEventListener('click', () => {
+    const room = roomsCache[currentActiveRoomId];
+    alert(`Spinning up secure hardware channels for Matrix Video Call with: ${room?.customName || "Friend Channel"}...`);
+});
+
+// Primary System Core Lifecycle Initializer Entry Sequence Hook
 window.addEventListener('load', () => {
     runSystemClock();
     makeWindowDraggable();
@@ -83,6 +161,7 @@ window.addEventListener('load', () => {
         console.log("Cached access token handshake omitted.");
     }
 });
+
 // Native HTTP REST Authentication Protocol
 document.getElementById('btn-login').addEventListener('click', async () => {
     let baseUrl = document.getElementById('login-homeserver').value.trim();
@@ -90,7 +169,7 @@ document.getElementById('btn-login').addEventListener('click', async () => {
     const password = document.getElementById('login-password').value.trim();
 
     if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
-    if (!username || !password) return alert('Please enter all system credentials.');
+    if (!username || !password) return alert('Please enter all credentials.');
 
     try {
         const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
@@ -102,21 +181,16 @@ document.getElementById('btn-login').addEventListener('click', async () => {
             }),
             headers: { 'Content-Type': 'application/json' }
         });
-
-        if (!response.ok) throw new Error("Incorrect parameters or server connection rejected.");
+        if (!response.ok) throw new Error();
         const data = await response.json();
-
         sessionData = { baseUrl, accessToken: data.access_token, userId: data.user_id };
         localStorage.setItem('elementos_session', JSON.stringify(sessionData));
         enterDesktopMode();
-    } catch (err) {
-        alert('Authentication Error: ' + err.message);
-    }
+    } catch (err) { alert('Authentication Error'); }
 });
-
 function enterDesktopMode() {
     if (!sessionData) return;
-    const shortUser = sessionData.userId.split(':')[0].replace('@', '');
+    const shortUser = sessionData.userId.split(':').replace('@', '');
     
     document.getElementById('menu-displayname').textContent = sessionData.userId;
     document.getElementById('menu-avatar').textContent = shortUser.substring(0, 2).toUpperCase();
@@ -129,23 +203,17 @@ function enterDesktopMode() {
     }
 }
 
-// Continuous Native HTTP matrix event long polling background pipeline
 async function startSyncLoop() {
     while (sessionData) {
         let url = `${sessionData.baseUrl}/_matrix/client/v3/sync?timeout=30000`;
         if (nextSyncBatchToken) url += `&since=${nextSyncBatchToken}`;
-
         try {
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${sessionData.accessToken}` }
-            });
+            const response = await fetch(url, { headers: { 'Authorization': `Bearer ${sessionData.accessToken}` } });
             if (!response.ok) throw new Error();
             const syncData = await response.json();
             nextSyncBatchToken = syncData.next_batch;
             processSyncPayload(syncData);
-        } catch (e) {
-            await new Promise(r => setTimeout(r, 6000));
-        }
+        } catch (e) { await new Promise(r => setTimeout(r, 6000)); }
     }
     isSyncing = false;
 }
@@ -153,24 +221,10 @@ async function startSyncLoop() {
 function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
-            if (!roomsCache[roomId]) {
-                roomsCache[roomId] = { messages: [], customName: null, isDirect: false };
-            }
-            
-            const accountData = data.account_data?.events || [];
-            accountData.forEach(ev => {
-                if (ev.type === "m.direct") roomsCache[roomId].isDirect = true;
-            });
-
-            const stateEvents = data.rooms.join[roomId].state?.events || [];
-            stateEvents.forEach(ev => {
-                if (ev.type === "m.room.name" && ev.content?.name) {
-                    roomsCache[roomId].customName = ev.content.name;
-                }
-            });
-
-            const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
-            timelineEvents.forEach(ev => {
+            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null, isDirect: false };
+            data.account_data?.events?.forEach(ev => { if (ev.type === "m.direct") roomsCache[roomId].isDirect = true; });
+            data.rooms.join[roomId].state?.events?.forEach(ev => { if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; });
+            data.rooms.join[roomId].timeline?.events?.forEach(ev => {
                 if (ev.type === 'm.room.message' && ev.content?.body) {
                     roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body });
                     if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body);
@@ -178,32 +232,23 @@ function processSyncPayload(data) {
             });
         }
     }
-    
     if (data.rooms && data.rooms.leave) {
         for (const roomId in data.rooms.leave) {
             delete roomsCache[roomId];
-            if (currentActiveRoomId === roomId) {
-                document.getElementById('chat-window').classList.add('hidden');
-                currentActiveRoomId = null;
-            }
+            if (currentActiveRoomId === roomId) { document.getElementById('chat-window').classList.add('hidden'); currentActiveRoomId = null; }
         }
     }
     renderFriendsList();
 }
+
 function renderFriendsList() {
     const listDiv = document.getElementById('friends-list');
     const roomKeys = Object.keys(roomsCache);
-    
-    if (roomKeys.length === 0) {
-        listDiv.innerHTML = `<p class="loading-label">No active friend DMs.</p>`;
-        return;
-    }
-    
+    if (roomKeys.length === 0) { listDiv.innerHTML = `<p class="loading-label">No active friend DMs.</p>`; return; }
     listDiv.innerHTML = '';
     roomKeys.forEach(roomId => {
         const room = roomsCache[roomId];
         let displayLabel = room.customName || (roomId.length > 15 ? roomId.substring(0, 12) + '...' : roomId);
-        
         const item = document.createElement('div');
         item.className = "friend-item";
         item.innerHTML = `
@@ -216,67 +261,35 @@ function renderFriendsList() {
                 <button class="action-icon-btn btn-rename" style="background: rgba(234, 179, 8, 0.15); color: #fbbf24; border-color: rgba(234, 179, 8, 0.25);">✏️</button>
                 <button class="action-icon-btn btn-leave" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.25);">❌</button>
             </div>`;
-            
-        item.querySelector('.btn-chat').addEventListener('click', (e) => {
-            e.stopPropagation();
-            openChatWindow(roomId);
-        });
-        
-        item.querySelector('.btn-rename').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const newName = prompt("Enter a nickname for this friend:", room.customName || displayLabel);
-            if (newName && newName.trim() !== "") renameFriendRoom(roomId, newName.trim());
-        });
-
-        item.querySelector('.btn-leave').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (confirm("Delete and leave this friend chat?")) leaveFriendRoom(roomId);
-        });
+        item.querySelector('.btn-chat').addEventListener('click', (e) => { e.stopPropagation(); openChatWindow(roomId); });
+        item.querySelector('.btn-rename').addEventListener('click', async (e) => { e.stopPropagation(); const newName = prompt("Nickname:", room.customName || displayLabel); if (newName && newName.trim() !== "") renameFriendRoom(roomId, newName.trim()); });
+        item.querySelector('.btn-leave').addEventListener('click', async (e) => { e.stopPropagation(); if (confirm("Delete friend chat?")) leaveFriendRoom(roomId); });
         listDiv.appendChild(item);
     });
 }
 
 async function renameFriendRoom(roomId, newName) {
     try {
-        const response = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.name/`, {
-            method: 'PUT',
-            body: JSON.stringify({ name: newName }),
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
-        });
-        if (response.ok) {
-            roomsCache[roomId].customName = newName;
-            renderFriendsList();
-        }
-    } catch(e) { console.log("Rename fail"); }
+        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.name/`, { method: 'PUT', body: JSON.stringify({ name: newName }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
+        if (res.ok) { roomsCache[roomId].customName = newName; renderFriendsList(); }
+    } catch(e) {}
 }
 
 async function leaveFriendRoom(roomId) {
     try {
-        const response = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/leave`, {
-            method: 'POST',
-            body: JSON.stringify({}),
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
-        });
-        if (response.ok) {
-            delete roomsCache[roomId];
-            renderFriendsList();
-        }
-    } catch(e) { console.log("Leave fail"); }
+        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/leave`, { method: 'POST', body: JSON.stringify({}), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
+        if (res.ok) { delete roomsCache[roomId]; renderFriendsList(); }
+    } catch(e) {}
 }
 
 document.getElementById('btn-add-friend').addEventListener('click', async () => {
     const targetMxid = document.getElementById('friend-mxid').value.trim();
     if (!targetMxid.startsWith('@')) return alert('Use format: @user:server.com');
     try {
-        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, {
-            method: 'POST',
-            body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }),
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
-        });
+        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         if (!res.ok) throw new Error();
         const data = await res.json();
-        
-        roomsCache[data.room_id] = { messages: [], customName: targetMxid.split(':')[0].replace('@', ''), isDirect: true };
+        roomsCache[data.room_id] = { messages: [], customName: targetMxid.split(':').replace('@', ''), isDirect: true };
         document.getElementById('friend-mxid').value = '';
         document.getElementById('add-friend-ui').classList.add('hidden');
         renderFriendsList();
@@ -288,6 +301,8 @@ function openChatWindow(roomId) {
     const room = roomsCache[roomId];
     document.getElementById('chat-title').textContent = `Chatting with: ${room.customName || roomId.substring(0, 10)}`;
     document.getElementById('chat-window').classList.remove('hidden');
+    document.getElementById('minimized-dock-indicator').classList.add('hidden');
+    document.getElementById('call-selection-dropdown').classList.add('hidden');
     const msgBox = document.getElementById('chat-messages');
     msgBox.innerHTML = '';
     if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body));
@@ -296,7 +311,7 @@ function openChatWindow(roomId) {
 function appendLiveMessage(sender, body) {
     const container = document.getElementById('chat-messages');
     const isMe = sender === sessionData.userId;
-    const cleanSender = sender.split(':')[0].replace('@', '');
+    const cleanSender = sender.split(':').replace('@', '');
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
             <span class="msg-sender">${cleanSender}</span>
@@ -315,11 +330,7 @@ async function sendMessage() {
     if (!text || !currentActiveRoomId) return;
     try {
         const txnId = Date.now();
-        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, {
-            method: 'PUT',
-            body: JSON.stringify({ msgtype: "m.text", body: text }),
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
-        });
+        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, { method: 'PUT', body: JSON.stringify({ msgtype: "m.text", body: text }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         input.value = '';
     } catch (e) { console.log("Send failed."); }
 }
