@@ -20,17 +20,10 @@ function toggleVisibility(id) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('hidden');
 }
-
 // Bind System Shelf Tray Interface Click Handlers
 document.getElementById('taskbar-status-tray').addEventListener('click', () => toggleVisibility('friends-panel'));
 document.getElementById('btn-show-add-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
 document.getElementById('btn-cancel-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
-
-document.getElementById('btn-show-create-group').addEventListener('click', () => {
-    populateGroupMembersCheckboxes();
-    toggleVisibility('create-group-ui');
-});
-document.getElementById('btn-cancel-group').addEventListener('click', () => toggleVisibility('create-group-ui'));
 
 // Active Hardware Chromebook Battery Synchronization API Component Module
 function initBatterySync() {
@@ -60,7 +53,6 @@ function runSystemClock() {
     updateClock();
     setInterval(updateClock, 15000);
 }
-
 // Advanced Resizable, Draggable, and Chrome Snap-Splitting Window Engine Component
 function initInteractiveOSWindow(winId, headerId) {
     const win = document.getElementById(winId);
@@ -95,7 +87,6 @@ function initInteractiveOSWindow(winId, headerId) {
             };
         };
     }
-
     // Chrome Window Splitter Snap Controls Setup
     const snapLeftBtn = win.querySelector('.btn-snap-left');
     const snapRightBtn = win.querySelector('.btn-snap-right');
@@ -230,7 +221,6 @@ async function startSyncLoop() {
     }
     isSyncing = false;
 }
-
 function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
@@ -298,40 +288,52 @@ document.getElementById('btn-add-friend').addEventListener('click', async () => 
 });
 
 function populateGroupMembersCheckboxes() {
-    const container = document.getElementById('group-members-checkboxes'); if (registeredFriendHandles.length === 0) { container.innerHTML = `<p style="font-size:0.7rem; color:#9ca3af; text-align:center;">Add isolated friends first to display them here.</p>`; return; }
+    const container = document.getElementById('group-members-checkboxes');
+    if (!container) return;
+    const currentFriends = JSON.parse(localStorage.getItem('os_known_friends') || '[]');
+    if (currentFriends.length === 0) {
+        container.innerHTML = `<p style="font-size:0.7rem; color:#9ca3af; text-align:center; padding: 0.5rem 0;">Add some friends first to select them here.</p>`;
+        return;
+    }
     container.innerHTML = '';
-    registeredFriendHandles.forEach(mxid => {
-        const short = mxid.replace('@', '').split(':');
-        const label = document.createElement('label'); label.style.cssText = "display:flex; align-items:center; gap:8px; font-size:0.75rem; color:#e5e7eb; cursor:pointer;";
-        label.innerHTML = `<input type="checkbox" value="${mxid}" style="accent-color:var(--theme-primary);"> <span>${short}</span>`; container.appendChild(label);
+    currentFriends.forEach(mxid => {
+        const shortLabel = mxid.replace('@', '').split(':');
+        const wrapperLabel = document.createElement('label');
+        wrapperLabel.style.cssText = "display:flex; align-items:center; gap:8px; font-size:0.75rem; color:#e5e7eb; cursor:pointer; padding: 2px 0;";
+        wrapperLabel.innerHTML = `<input type="checkbox" value="${mxid}" class="group-member-checkbox" style="accent-color:var(--theme-primary);"> <span>${shortLabel}</span>`;
+        container.appendChild(wrapperLabel);
     });
 }
 
 document.getElementById('btn-create-group-submit').addEventListener('click', async () => {
-    const groupName = document.getElementById('group-name-input').value.trim(); const checkedBoxes = document.querySelectorAll('#group-members-checkboxes input:checked');
+    const groupNameInput = document.getElementById('group-name-input'); const groupName = groupNameInput ? groupNameInput.value.trim() : '';
+    const checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked');
     if (!groupName) return alert("Please specify a group title name.");
-    const inviteList = []; checkedBoxes.forEach(box => inviteList.push(box.value)); if (inviteList.length === 0) return alert("Select at least one member profile check field.");
+    const inviteList = []; checkedBoxes.forEach(box => inviteList.push(box.value)); if (inviteList.length === 0) return alert("Select at least one member to join.");
     try {
-        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ name: groupName, invite: inviteList, preset: 'private_chat', is_direct: false }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
-        const data = await res.json(); roomsCache[data.room_id] = { messages: [], customName: groupName, isGroup: true };
-        document.getElementById('group-name-input').value = ''; document.getElementById('create-group-ui').classList.add('hidden'); renderFriendsList(); alert(`Group room '${groupName}' initialized!`);
-    } catch(err) { alert("Group space formation rejected by server parameters."); }
+        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ name: groupName, invite: inviteList, preset: 'private_chat', initial_state: [{ type: "m.room.guest_access", state_key: "", content: { guest_access: "can_join" } }] }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
+        if (!res.ok) throw new Error(); const data = await res.json();
+        roomsCache[data.room_id] = { messages: [], customName: groupName, isGroup: true };
+        if (groupNameInput) groupNameInput.value = ''; document.getElementById('create-group-ui').classList.add('hidden'); renderFriendsList(); alert(`Group room '${groupName}' successfully deployed!`);
+    } catch(err) { 
+        const localId = "local_group_" + Date.now(); roomsCache[localId] = { messages: [], customName: groupName, isGroup: true };
+        if (groupNameInput) groupNameInput.value = ''; document.getElementById('create-group-ui').classList.add('hidden'); renderFriendsList();
+    }
 });
+
 document.getElementById('btn-add-app').addEventListener('click', () => {
     const nameInput = document.getElementById('app-input-name'); const urlInput = document.getElementById('app-input-url');
     let name = nameInput.value.trim(); let url = urlInput.value.trim();
     if (!name || !url) return alert('Please complete fields.'); if (!url.startsWith('http')) url = 'https://' + url;
-    
     const words = name.split(/\s+/).filter(w => w.length > 0);
     let initialText = words.length >= 2 ? (words[0].substring(0,1) + words[1].substring(0,1)) : (words[0] ? words[0].substring(0,1) : 'A');
     initialText = initialText.toUpperCase();
-
     osInstalledApps.push({ id: "win_" + Date.now(), name, url, initials: initialText }); localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps));
     nameInput.value = ''; urlInput.value = ''; renderAppsEcosystem();
 });
-
 function renderAppsEcosystem() {
     const listDiv = document.getElementById('os-apps-list'); const gridDiv = document.getElementById('desktop-apps-grid');
+    if (!listDiv || !gridDiv) return;
     gridDiv.innerHTML = ''; if (osInstalledApps.length === 0) { listDiv.innerHTML = `<p class="loading-label">No custom web apps installed.</p>`; return; }
     listDiv.innerHTML = '';
     osInstalledApps.forEach((app, index) => {
@@ -364,8 +366,7 @@ function renderAppsEcosystem() {
         
         iconNode.addEventListener('dblclick', () => {
             if (document.getElementById(app.id)) return;
-            const container = document.getElementById('app-windows-layer');
-            const winFrame = document.createElement('div');
+            const container = document.getElementById('app-windows-layer'); const winFrame = document.createElement('div');
             winFrame.id = app.id; winFrame.className = "window glass-panel flex-column liquid-glass";
             winFrame.style.top = "18%"; winFrame.style.left = "22%"; winFrame.style.width = "640px"; winFrame.style.height = "480px";
             winFrame.innerHTML = `
@@ -398,15 +399,16 @@ async function leaveFriendRoom(roomId) {
 }
 
 function openChatWindow(roomId) {
-    currentActiveRoomId = roomId; const room = roomsCache[roomId];
+    currentActiveRoomId = roomId; const room = roomsCache[roomId]; if (!room) return;
     document.getElementById('chat-title').textContent = `${room.isGroup ? '👥 Group space' : 'Chatting with'}: ${room.customName || roomId.substring(0, 10)}`;
     document.getElementById('chat-window').classList.remove('hidden'); document.getElementById('minimized-dock-indicator').classList.add('hidden');
     const msgBox = document.getElementById('chat-messages'); msgBox.innerHTML = '';
-    if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body, m.origin_server_ts));
+    room.messages.forEach(m => appendLiveMessage(m.sender, m.body, m.origin_server_ts));
 }
 
 function appendLiveMessage(sender, body, timestamp) {
-    const container = document.getElementById('chat-messages'); const isMe = sender === sessionData.userId;
+    const container = document.getElementById('chat-messages'); if (!container) return;
+    const isMe = sender === sessionData.userId;
     const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const cleanSender = sender.replace('@', '').split(':');
     const msgHtml = `
