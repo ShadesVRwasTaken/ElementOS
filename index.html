@@ -65,7 +65,7 @@
         </div>
     </main>
 
-    <!-- 3. REDESIGNED CHROMEOS-STYLE SPLIT TABBED DRAWER PANEL MENU -->
+    <!-- 3. REDESIGNED PREMIUM LIQUID GLASS DRAWER PANEL MENU -->
     <div id="friends-panel" class="hidden liquid-glass-drawer">
         <div class="menu-profile-banner">
             <div id="menu-avatar" class="menu-avatar">E</div>
@@ -75,7 +75,7 @@
             </div>
         </div>
 
-        <div style="display: flex; background: rgba(0,0,0,0.25); margin: 0 1rem; border-radius: 0.75rem; padding: 2px; gap: 2px;">
+        <div style="display: flex; background: rgba(0,0,0,0.25); margin: 0 1rem; border-radius: 0.75rem; padding: 4px; gap: 4px;">
             <button id="tab-btn-friends" class="menu-tab-trigger active-tab">👥 Friends</button>
             <button id="tab-btn-apps" class="menu-tab-trigger">📱 Apps</button>
             <button id="tab-btn-settings" class="menu-tab-trigger">⚙️ Settings</button>
@@ -154,6 +154,11 @@
         </div>
     </footer>
 
-    <script src="app.js"></script>
+    <!-- FIXED: Added a cache-busting timestamp version token to force ChromeOS to clear the script cache immediately -->
+    <script>
+        const script = document.createElement('script');
+        script.src = 'app.js?v=' + Date.now();
+        document.body.appendChild(script);
+    </script>
 </body>
 </html>

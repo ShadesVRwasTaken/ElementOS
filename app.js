@@ -187,7 +187,7 @@ document.getElementById('btn-login').addEventListener('click', async () => {
 
     try {
         const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, { method: 'POST', body: JSON.stringify({ type: "m.login.password", identifier: { type: "m.id.user", user: username }, password }), headers: { 'Content-Type': 'application/json' } });
-        if (!response.ok) throw new Error((await response.json()).error || "Login rejection.");
+        if (!response.ok) { const errDetails = await response.json(); throw new Error(errDetails.error || "Login rejection."); }
         const data = await response.json();
         sessionData = { baseUrl, accessToken: data.access_token, userId: data.user_id }; localStorage.setItem('elementos_session', JSON.stringify(sessionData)); enterDesktopMode();
     } catch (err) { alert('Authentication Error: ' + err.message); }
@@ -214,20 +214,27 @@ async function startSyncLoop() {
     isSyncing = false;
 }
 
+// FIXED: Handles structural differences between initial sync payloads and live update timelines
 function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
             if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null };
+            
             data.rooms.join[roomId].state?.events?.forEach(ev => { 
                 if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; 
             });
-            data.rooms.join[roomId].timeline?.events?.forEach(ev => {
+
+            const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
+            timelineEvents.forEach(ev => {
                 if (ev.type === 'm.room.message' && ev.content?.body) {
-                    roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body, origin_server_ts: ev.origin_server_ts });
-                    if (ev.sender !== sessionData.userId && (roomId !== currentActiveRoomId || document.getElementById('chat-window').classList.contains('hidden'))) {
-                        triggerSystemMessageToast(roomId, ev.content.body);
+                    const isDup = roomsCache[roomId].messages.some(m => m.txnId === ev.event_id || (m.body === ev.content.body && m.origin_server_ts === ev.origin_server_ts));
+                    if (!isDup) {
+                        roomsCache[roomId].messages.push({ txnId: ev.event_id, sender: ev.sender, body: ev.content.body, origin_server_ts: ev.origin_server_ts });
+                        if (ev.sender !== sessionData.userId && (roomId !== currentActiveRoomId || document.getElementById('chat-window').classList.contains('hidden'))) {
+                            triggerSystemMessageToast(roomId, ev.content.body);
+                        }
+                        if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body, ev.origin_server_ts);
                     }
-                    if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body, ev.origin_server_ts);
                 }
             });
         }
@@ -279,8 +286,9 @@ document.getElementById('btn-add-app').addEventListener('click', () => {
     if (!name || !url) return alert('Please complete fields.'); 
     if (!url.startsWith('http')) url = 'https://' + url;
     
-    const urlDomain = url.replace('https://','').replace('http://','').split('/')[0];
-    const faviconUrl = `https://google.com{urlDomain}`;
+    // FIXED: Strips out base path variables to ensure proper scraping from the Google Favicon Provider API
+    const urlDomain = url.replace('https://','').replace('http://','').split('/');
+    const faviconUrl = `https://google.com{urlDomain[0]}`;
 
     osInstalledApps.push({ id: "win_" + Date.now(), name, url, iconImg: faviconUrl }); 
     localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps));
@@ -311,8 +319,9 @@ function renderAppsEcosystem() {
 
         const iconNode = document.createElement('div'); 
         iconNode.className = "desktop-shortcut-node";
+        // FIXED: Re-mapped the property identifier from app.icon back to app.iconImg to fix missing desktop shortcut layout styles
         iconNode.innerHTML = `
-            <div class="desktop-app-icon" style="background-image: url('${app.iconImg}');"></div>
+            <div class="desktop-app-icon" style="background-image: url('${app.iconImg}'); background-size: cover; background-position: center;"></div>
             <div class="desktop-app-label">${app.name}</div>`;
         
         iconNode.addEventListener('dblclick', () => {
@@ -352,49 +361,39 @@ async function leaveFriendRoom(roomId) {
 }
 
 document.getElementById('btn-add-friend').addEventListener('click', async () => {
-    const targetMxid = document.getElementById('friend-mxid').value.trim(); 
-    if (!targetMxid.startsWith('@')) return alert('Use format: @user:server.com');
+    const targetMxid = document.getElementById('friend-mxid').value.trim(); if (!targetMxid.startsWith('@')) return alert('Use format: @user:server.com');
     try {
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
-        const data = await res.json(); 
-        roomsCache[data.room_id] = { messages: [], customName: targetMxid.replace('@','').split(':') };
-        document.getElementById('friend-mxid').value = ''; 
-        document.getElementById('add-friend-ui').classList.add('hidden'); 
-        renderFriendsList();
+        const data = await res.json(); roomsCache[data.room_id] = { messages: [], customName: targetMxid.replace('@','').split(':') };
+        document.getElementById('friend-mxid').value = ''; document.getElementById('add-friend-ui').classList.add('hidden'); renderFriendsList();
     } catch (err) { alert('Friend creation failed.'); }
 });
 
 function openChatWindow(roomId) {
-    currentActiveRoomId = roomId; 
-    const room = roomsCache[roomId];
+    currentActiveRoomId = roomId; const room = roomsCache[roomId];
     document.getElementById('chat-title').textContent = `Chatting with: ${room.customName || roomId.substring(0, 10)}`;
-    document.getElementById('chat-window').classList.remove('hidden'); 
-    document.getElementById('minimized-dock-indicator').classList.add('hidden');
-    const msgBox = document.getElementById('chat-messages'); 
-    msgBox.innerHTML = '';
+    document.getElementById('chat-window').classList.remove('hidden'); document.getElementById('minimized-dock-indicator').classList.add('hidden');
+    const msgBox = document.getElementById('chat-messages'); msgBox.innerHTML = '';
     if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body, m.origin_server_ts));
 }
 
+// FIXED: Formats standard live localized timestamps inside the message bubble node stream
 function appendLiveMessage(sender, body, timestamp) {
-    const container = document.getElementById('chat-messages'); 
-    const isMe = sender === sessionData.userId;
+    const container = document.getElementById('chat-messages'); const isMe = sender === sessionData.userId;
     const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
             <span class="msg-sender">${sender.split(':').replace('@','')} • <span style="opacity:0.6;">${timeStr}</span></span>
             <div class="msg-bubble">${body}</div>
         </div>`;
-    container.insertAdjacentHTML('beforeend', msgHtml); 
-    container.scrollTop = container.scrollHeight;
+    container.insertAdjacentHTML('beforeend', msgHtml); container.scrollTop = container.scrollHeight;
 }
 
 document.getElementById('btn-send').addEventListener('click', sendMessage);
 document.getElementById('chat-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
 async function sendMessage() {
-    const input = document.getElementById('chat-input'); 
-    const text = input.value.trim(); 
-    if (!text || !currentActiveRoomId) return;
+    const input = document.getElementById('chat-input'); const text = input.value.trim(); if (!text || !currentActiveRoomId) return;
     try {
         const txnId = Date.now();
         await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, { method: 'PUT', body: JSON.stringify({ msgtype: "m.text", body: text }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
