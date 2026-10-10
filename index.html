@@ -53,7 +53,7 @@
         <div id="system-message-toast" class="hidden liquid-glass" style="position: absolute; bottom: 4.5rem; right: 1rem; width: 320px; border-left: 4px solid var(--theme-primary, #0d9488); padding: 1rem; z-index: 100; display: flex; align-items: center; gap: 14px;">
             <div style="font-size: 1.25rem; background: rgba(255,255,255,0.1); width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--theme-primary, #2dd4bf); flex-shrink: 0;">💬</div>
             <div style="display: flex; flex-direction: column; overflow: hidden; flex: 1;">
-                <h5 id="toast-sender-title" style="font-size: 0.8rem; font-weight: 600; color: #ffffff; margin-bottom: 1px;">Sender</h5>
+                <h5 id="toast-sender-title" style="font-size: 0.8rem; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px;">Sender</h5>
                 <p id="toast-message-body" style="font-size: 0.75rem; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;">Preview</p>
             </div>
         </div>
@@ -65,7 +65,7 @@
         </div>
     </main>
 
-    <!-- 3. REDESIGNED PREMIUM LIQUID GLASS DRAWER PANEL MENU -->
+    <!-- 3. PREMIUM LIQUID GLASS HUB PANEL -->
     <div id="friends-panel" class="hidden liquid-glass-drawer">
         <div class="menu-profile-banner">
             <div id="menu-avatar" class="menu-avatar">E</div>
@@ -81,27 +81,44 @@
             <button id="tab-btn-settings" class="menu-tab-trigger">⚙️ Settings</button>
         </div>
 
+        <!-- TAB CONTENT A: CHATS & GROUPS LAYER PANEL -->
         <div id="tab-content-friends" class="tab-content-panel">
             <div class="panel-header">
                 <h3>Contacts & Friends</h3>
-                <button id="btn-show-add-friend" class="add-btn-circle">+</button>
+                <button id="btn-show-add-friend" class="add-btn-circle" title="Add Contact">+</button>
             </div>
             <div id="add-friend-ui" class="add-friend-box hidden">
-                <input id="friend-mxid" type="text" placeholder="@username:server.com" class="sys-input add-friend-sizing">
+                <input id="friend-mxid" type="text" placeholder="Type contact username (e.g. lizard)" class="sys-input add-friend-sizing">
                 <div class="flex-container">
-                    <button id="btn-add-friend" class="sys-btn add-friend-sizing flex-1">Add Friend</button>
+                    <button id="btn-add-friend" class="sys-btn add-friend-sizing flex-1">Add Contact</button>
                     <button id="btn-cancel-friend" class="sys-btn cancel-btn">Cancel</button>
                 </div>
             </div>
+
+            <div class="panel-header" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
+                <h3>Group Spaces</h3>
+                <button id="btn-show-create-group" class="add-btn-circle" style="background:#0284c7 !important;">+</button>
+            </div>
+            <div id="create-group-ui" class="add-friend-box hidden">
+                <input id="group-name-input" type="text" placeholder="Group Name (e.g. Space Crew)" class="sys-input add-friend-sizing">
+                <p style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 0.35rem; padding-left: 2px;">Select Members:</p>
+                <div id="group-members-checkboxes" style="max-height: 90px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.5rem; display: flex; flex-direction: column; gap: 6px; margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.05);"></div>
+                <div class="flex-container">
+                    <button id="btn-create-group-submit" class="sys-btn add-friend-sizing flex-1" style="background:#0284c7 !important;">Form Group</button>
+                    <button id="btn-cancel-group" class="sys-btn cancel-btn">Cancel</button>
+                </div>
+            </div>
+
             <div id="friends-list" class="friend-list-container">
-                <p class="loading-label">Loading inner circle...</p>
+                <p class="loading-label">Loading channels...</p>
             </div>
         </div>
 
+        <!-- TAB CONTENT B: VIRTUAL APPS STORE MANAGER CONTAINER -->
         <div id="tab-content-apps" class="tab-content-panel hidden" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto;">
             <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 1rem; display: flex; flex-direction: column; gap: 8px;">
                 <h4 style="font-size: 0.8rem; font-weight: 600; color: #fff;">Install Custom Web Application</h4>
-                <input id="app-input-name" type="text" placeholder="App Name (e.g. YouTube)" class="sys-input" style="font-size: 0.75rem; padding: 0.5rem; margin: 0;">
+                <input id="app-input-name" type="text" placeholder="App Name (e.g. Google Docs)" class="sys-input" style="font-size: 0.75rem; padding: 0.5rem; margin: 0;">
                 <input id="app-input-url" type="text" placeholder="URL Web Link (https://...)" class="sys-input" style="font-size: 0.75rem; padding: 0.5rem; margin: 0;">
                 <button id="btn-add-app" class="sys-btn" style="font-size: 0.75rem; padding: 0.5rem; margin-top: 2px; border-radius: 0.5rem;">⚡ Create Shortcut</button>
             </div>
@@ -113,6 +130,7 @@
             </div>
         </div>
 
+        <!-- TAB CONTENT C: CUSTOMIZATION SETTINGS CONTAINER -->
         <div id="tab-content-settings" class="tab-content-panel hidden" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; flex: 1;">
             <div>
                 <h4 style="font-size: 0.8rem; font-weight: 600; color: #e5e7eb; margin-bottom: 0.5rem;">System Accent Color</h4>
@@ -154,7 +172,7 @@
         </div>
     </footer>
 
-    <!-- FIXED: Added a cache-busting timestamp version token to force ChromeOS to clear the script cache immediately -->
+    <!-- Force script refresh cache bust bypass -->
     <script>
         const script = document.createElement('script');
         script.src = 'app.js?v=' + Date.now();

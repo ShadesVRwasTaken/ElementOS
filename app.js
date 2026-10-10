@@ -5,9 +5,10 @@ let nextSyncBatchToken = null;
 let roomsCache = {};
 let isSyncing = false;
 
-// Custom Local Repositories for Apps and Avatars
+// Custom Local Repositories for Apps, Avatars, and Tracked Members
 let customFriendAvatars = JSON.parse(localStorage.getItem('os_friend_avatars') || '{}');
 let osInstalledApps = JSON.parse(localStorage.getItem('os_installed_apps') || '[]');
+let registeredFriendHandles = JSON.parse(localStorage.getItem('os_known_friends') || '[]');
 let targetAvatarUploadRoomId = null;
 
 // Window Layout geometric context caching states
@@ -24,6 +25,12 @@ function toggleVisibility(id) {
 document.getElementById('taskbar-status-tray').addEventListener('click', () => toggleVisibility('friends-panel'));
 document.getElementById('btn-show-add-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
 document.getElementById('btn-cancel-friend').addEventListener('click', () => toggleVisibility('add-friend-ui'));
+
+document.getElementById('btn-show-create-group').addEventListener('click', () => {
+    populateGroupMembersCheckboxes();
+    toggleVisibility('create-group-ui');
+});
+document.getElementById('btn-cancel-group').addEventListener('click', () => toggleVisibility('create-group-ui'));
 
 // Active Hardware Chromebook Battery Synchronization API Component Module
 function initBatterySync() {
@@ -202,26 +209,20 @@ function enterDesktopMode() {
 }
 async function startSyncLoop() {
     while (sessionData) {
-        let url = `${sessionData.baseUrl}/_matrix/client/v3/sync?timeout=30000`; 
-        if (nextSyncBatchToken) url += `&since=${nextSyncBatchToken}`;
+        let url = `${sessionData.baseUrl}/_matrix/client/v3/sync?timeout=30000`; if (nextSyncBatchToken) url += `&since=${nextSyncBatchToken}`;
         try {
             const response = await fetch(url, { headers: { 'Authorization': `Bearer ${sessionData.accessToken}` } });
-            const syncData = await response.json(); 
-            nextSyncBatchToken = syncData.next_batch; 
-            processSyncPayload(syncData);
+            const syncData = await response.json(); nextSyncBatchToken = syncData.next_batch; processSyncPayload(syncData);
         } catch (e) { await new Promise(r => setTimeout(r, 6000)); }
     }
     isSyncing = false;
 }
 
-// FIXED: Handles structural differences between initial sync payloads and live update timelines
 function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
-            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null };
-            data.rooms.join[roomId].state?.events?.forEach(ev => { 
-                if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; 
-            });
+            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null, isGroup: false };
+            data.rooms.join[roomId].state?.events?.forEach(ev => { if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; });
             const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
             timelineEvents.forEach(ev => {
                 if (ev.type === 'm.room.message' && ev.content?.body) {
@@ -240,57 +241,61 @@ function processSyncPayload(data) {
     renderFriendsList();
 }
 function renderFriendsList() {
-    const listDiv = document.getElementById('friends-list'); 
-    const roomKeys = Object.keys(roomsCache);
+    const listDiv = document.getElementById('friends-list'); const roomKeys = Object.keys(roomsCache);
     if (roomKeys.length === 0) { listDiv.innerHTML = `<p class="loading-label">No active channels.</p>`; return; }
     listDiv.innerHTML = '';
     roomKeys.forEach(roomId => {
-        const room = roomsCache[roomId]; 
-        let displayLabel = room.customName || (roomId.length > 15 ? roomId.substring(0, 12) + '...' : roomId);
+        const room = roomsCache[roomId]; let displayLabel = room.customName || (roomId.length > 15 ? roomId.substring(0, 12) + '...' : roomId);
         const savedAvatar = customFriendAvatars[roomId];
 
-        const item = document.createElement('div'); 
-        item.className = "friend-item";
+        const item = document.createElement('div'); item.className = "friend-item";
         item.innerHTML = `
             <div class="friend-meta">
-                <div class="friend-avatar">👤</div>
+                <div class="friend-avatar">${room.isGroup ? '👥' : '👤'}</div>
                 <div class="friend-name" title="${roomId}">${displayLabel}</div>
             </div>
             <div class="friend-actions-group">
                 <button class="action-icon-btn btn-chat">Chat</button>
                 <button class="action-icon-btn btn-rename">✏️</button>
-                <button class="action-icon-btn btn-avatar-up">🖼️</button>
+                <button class="action-icon-btn btn-avatar-up">${room.isGroup ? '⚙' : '🖼️'}</button>
                 <button class="action-icon-btn btn-leave" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.25);">❌</button>
             </div>`;
 
-        if (savedAvatar) { const avatarEl = item.querySelector('.friend-avatar'); avatarEl.style.backgroundImage = `url('${savedAvatar}')`; avatarEl.style.textIndent = '-9999px'; }
+        if (savedAvatar && !room.isGroup) { const avatarEl = item.querySelector('.friend-avatar'); avatarEl.style.backgroundImage = `url('${savedAvatar}')`; avatarEl.style.textIndent = '-9999px'; }
         item.querySelector('.btn-chat').addEventListener('click', () => openChatWindow(roomId));
-        item.querySelector('.btn-leave').addEventListener('click', () => { if(confirm("Delete friend DM?")) leaveFriendRoom(roomId); });
+        item.querySelector('.btn-leave').addEventListener('click', () => { if(confirm(room.isGroup ? "Leave group chat space?" : "Delete friend DM?")) leaveFriendRoom(roomId); });
         item.querySelector('.btn-rename').addEventListener('click', (e) => {
-            e.stopPropagation(); 
-            const newName = prompt("Enter a nickname for this friend:", room.customName || displayLabel);
+            e.stopPropagation(); const newName = prompt(room.isGroup ? "Rename group chat space:" : "Enter a nickname for this friend:", room.customName || displayLabel);
             if (newName && newName.trim() !== "") { roomsCache[roomId].customName = newName.trim(); renderFriendsList(); }
         });
-        item.querySelector('.btn-avatar-up').addEventListener('click', (e) => { e.stopPropagation(); targetAvatarUploadRoomId = roomId; document.getElementById('friend-avatar-file-proxy').click(); });
+        item.querySelector('.btn-avatar-up').addEventListener('click', (e) => { e.stopPropagation(); if (room.isGroup) { alert("Group profile configuration coming in a downstream core patch!"); } else { targetAvatarUploadRoomId = roomId; document.getElementById('friend-avatar-file-proxy').click(); } });
         listDiv.appendChild(item);
     });
 }
 
-document.getElementById('btn-add-app').addEventListener('click', () => {
-    const nameInput = document.getElementById('app-input-name'); 
-    const urlInput = document.getElementById('app-input-url');
-    let name = nameInput.value.trim(); 
-    let url = urlInput.value.trim();
-    if (!name || !url) return alert('Please complete fields.'); 
-    if (!url.startsWith('http')) url = 'https://' + url;
-    
-    const urlDomain = url.replace('https://','').replace('http://','').split('/');
-    const faviconUrl = `https://google.com{urlDomain}`;
+document.getElementById('btn-add-friend').addEventListener('click', async () => {
+    let targetMxid = document.getElementById('friend-mxid').value.trim(); if (!targetMxid) return;
+    if (!targetMxid.startsWith('@')) { const domain = sessionData.baseUrl.replace('https://','').replace('http://',''); targetMxid = `@${targetMxid}:${domain}`; }
+    try {
+        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
+        const data = await res.json(); roomsCache[data.room_id] = { messages: [], customName: targetMxid.replace('@','').split(':'), isGroup: false };
+        if (!registeredFriendHandles.includes(targetMxid)) { registeredFriendHandles.push(targetMxid); localStorage.setItem('os_known_friends', JSON.stringify(registeredFriendHandles)); }
+        document.getElementById('friend-mxid').value = ''; document.getElementById('add-friend-ui').classList.add('hidden'); renderFriendsList();
+    } catch (err) { alert('Friend creation failed.'); }
+});
 
-    osInstalledApps.push({ id: "win_" + Date.now(), name, url, iconImg: faviconUrl }); 
-    localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps));
-    nameInput.value = ''; urlInput.value = ''; 
-    renderAppsEcosystem();
+document.getElementById('btn-add-app').addEventListener('click', () => {
+    const nameInput = document.getElementById('app-input-name'); const urlInput = document.getElementById('app-input-url');
+    let name = nameInput.value.trim(); let url = urlInput.value.trim();
+    if (!name || !url) return alert('Please complete fields.'); if (!url.startsWith('http')) url = 'https://' + url;
+    
+    // FIXED: Generates clean 1-letter or 2-letter uppercase initials text blocks matching your app nickname fields
+    const words = name.split(/\s+/).filter(w => w.length > 0);
+    let initialText = words.length >= 2 ? (words[0].substring(0,1) + words[1].substring(0,1)) : (words[0] ? words[0].substring(0,1) : 'A');
+    initialText = initialText.toUpperCase();
+
+    osInstalledApps.push({ id: "win_" + Date.now(), name, url, initials: initialText }); localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps));
+    nameInput.value = ''; urlInput.value = ''; renderAppsEcosystem();
 });
 function renderAppsEcosystem() {
     const listDiv = document.getElementById('os-apps-list'); 
@@ -303,21 +308,29 @@ function renderAppsEcosystem() {
         item.className = "friend-item";
         item.innerHTML = `
             <div class="friend-meta">
-                <div class="friend-avatar" style="background-image: url('${app.iconImg}'); text-indent: -9999px;">🌐</div>
+                <div class="friend-avatar" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); font-size:0.75rem; font-weight:bold; color:var(--theme-primary); display:flex; align-items:center; justify-content:center; border-radius:50%; width:32px; height:32px;">${app.initials}</div>
                 <div class="friend-name">${app.name}</div>
             </div>
             <div class="friend-actions-group">
                 <button class="action-icon-btn btn-app-rename">✏️</button>
                 <button class="action-icon-btn btn-app-del" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.25);">❌</button>
             </div>`;
-        item.querySelector('.btn-app-rename').addEventListener('click', () => { const newName = prompt("Rename:", app.name); if (newName && newName.trim() !== "") { osInstalledApps[index].name = newName.trim(); localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps)); renderAppsEcosystem(); } });
+        item.querySelector('.btn-app-rename').addEventListener('click', () => { 
+            const newName = prompt("Rename app:", app.name); 
+            if (newName && newName.trim() !== "") { 
+                const words = newName.trim().split(/\s+/).filter(w => w.length > 0);
+                app.initials = words.length >= 2 ? (words[0].substring(0,1) + words[1].substring(0,1)) : words[0].substring(0,1);
+                app.initials = app.initials.toUpperCase(); app.name = newName.trim(); 
+                localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps)); renderAppsEcosystem(); 
+            } 
+        });
         item.querySelector('.btn-app-del').addEventListener('click', () => { if(confirm("Uninstall app?")) { osInstalledApps.splice(index, 1); localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps)); renderAppsEcosystem(); } });
         listDiv.appendChild(item);
 
         const iconNode = document.createElement('div'); 
         iconNode.className = "desktop-shortcut-node";
         iconNode.innerHTML = `
-            <div class="desktop-app-icon" style="background-image: url('${app.iconImg}'); background-size: cover; background-position: center; background-color: transparent;"></div>
+            <div class="desktop-app-icon" style="background:var(--theme-primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:700; box-shadow:0 8px 16px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.25);">${app.initials}</div>
             <div class="desktop-app-label">${app.name}</div>`;
         
         iconNode.addEventListener('dblclick', () => {
@@ -341,14 +354,13 @@ function renderAppsEcosystem() {
                     <iframe src="${app.url}" style="width:100%; height:100%; border:none;"></iframe>
                 </div>
                 <div class="window-resize-handle"></div>`;
-            container.appendChild(winFrame);
+            container.appendChild(winFrame); 
             initInteractiveOSWindow(app.id, `head_${app.id}`);
             document.getElementById(`close_${app.id}`).addEventListener('click', () => winFrame.remove());
         });
         gridDiv.appendChild(iconNode);
     });
 }
-
 async function leaveFriendRoom(roomId) {
     try {
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/leave`, { method: 'POST', body: JSON.stringify({}), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
@@ -356,28 +368,18 @@ async function leaveFriendRoom(roomId) {
     } catch(e) {}
 }
 
-document.getElementById('btn-add-friend').addEventListener('click', async () => {
-    const targetMxid = document.getElementById('friend-mxid').value.trim(); if (!targetMxid.startsWith('@')) return alert('Use format: @user:server.com');
-    try {
-        const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
-        const data = await res.json(); roomsCache[data.room_id] = { messages: [], customName: targetMxid.replace('@','').split(':') };
-        document.getElementById('friend-mxid').value = ''; document.getElementById('add-friend-ui').classList.add('hidden'); renderFriendsList();
-    } catch (err) { alert('Friend creation failed.'); }
-});
-
 function openChatWindow(roomId) {
     currentActiveRoomId = roomId; const room = roomsCache[roomId];
-    document.getElementById('chat-title').textContent = `Chatting with: ${room.customName || roomId.substring(0, 10)}`;
+    document.getElementById('chat-title').textContent = `${room.isGroup ? '👥 Group space' : 'Chatting with'}: ${room.customName || roomId.substring(0, 10)}`;
     document.getElementById('chat-window').classList.remove('hidden'); document.getElementById('minimized-dock-indicator').classList.add('hidden');
     const msgBox = document.getElementById('chat-messages'); msgBox.innerHTML = '';
     if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body, m.origin_server_ts));
 }
 
-// FIXED: Clean string-only operations instead of calling methods onto raw array handlers to unlock chat bubble rendering!
 function appendLiveMessage(sender, body, timestamp) {
     const container = document.getElementById('chat-messages'); const isMe = sender === sessionData.userId;
     const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    const cleanSender = sender.replace('@', '').split(':');
+    const cleanSender = sender.replace('@', '').split(':')[0];
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
             <span class="msg-sender">${cleanSender} • <span style="opacity:0.6;">${timeStr}</span></span>
