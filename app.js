@@ -32,7 +32,7 @@ function runSystemClock() {
     }
     
     updateClock();
-    setInterval(updateClock, 15000); // Check ticks
+    setInterval(updateClock, 15000);
 }
 
 // Desktop Draggable Window Component Engine
@@ -153,7 +153,22 @@ async function startSyncLoop() {
 function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
-            if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [] };
+            if (!roomsCache[roomId]) {
+                roomsCache[roomId] = { messages: [], customName: null, isDirect: false };
+            }
+            
+            const accountData = data.account_data?.events || [];
+            accountData.forEach(ev => {
+                if (ev.type === "m.direct") roomsCache[roomId].isDirect = true;
+            });
+
+            const stateEvents = data.rooms.join[roomId].state?.events || [];
+            stateEvents.forEach(ev => {
+                if (ev.type === "m.room.name" && ev.content?.name) {
+                    roomsCache[roomId].customName = ev.content.name;
+                }
+            });
+
             const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
             timelineEvents.forEach(ev => {
                 if (ev.type === 'm.room.message' && ev.content?.body) {
@@ -162,20 +177,33 @@ function processSyncPayload(data) {
                 }
             });
         }
-        renderFriendsList();
     }
+    
+    if (data.rooms && data.rooms.leave) {
+        for (const roomId in data.rooms.leave) {
+            delete roomsCache[roomId];
+            if (currentActiveRoomId === roomId) {
+                document.getElementById('chat-window').classList.add('hidden');
+                currentActiveRoomId = null;
+            }
+        }
+    }
+    renderFriendsList();
 }
-
 function renderFriendsList() {
     const listDiv = document.getElementById('friends-list');
     const roomKeys = Object.keys(roomsCache);
+    
     if (roomKeys.length === 0) {
-        listDiv.innerHTML = `<p class="loading-label">No active friend channels.</p>`;
+        listDiv.innerHTML = `<p class="loading-label">No active friend DMs.</p>`;
         return;
     }
+    
     listDiv.innerHTML = '';
     roomKeys.forEach(roomId => {
-        const displayLabel = roomId.length > 20 ? roomId.substring(0, 16) + '...' : roomId;
+        const room = roomsCache[roomId];
+        let displayLabel = room.customName || (roomId.length > 15 ? roomId.substring(0, 12) + '...' : roomId);
+        
         const item = document.createElement('div');
         item.className = "friend-item";
         item.innerHTML = `
@@ -183,18 +211,62 @@ function renderFriendsList() {
                 <div class="friend-avatar">👤</div>
                 <div class="friend-name" title="${roomId}">${displayLabel}</div>
             </div>
-            <div class="friend-actions-group"><button class="action-icon-btn">Chat</button></div>`;
-        item.querySelector('.action-icon-btn').addEventListener('click', (e) => {
+            <div class="friend-actions-group" style="display: flex; gap: 4px;">
+                <button class="action-icon-btn btn-chat">Chat</button>
+                <button class="action-icon-btn btn-rename" style="background: rgba(234, 179, 8, 0.15); color: #fbbf24; border-color: rgba(234, 179, 8, 0.25);">✏️</button>
+                <button class="action-icon-btn btn-leave" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.25);">❌</button>
+            </div>`;
+            
+        item.querySelector('.btn-chat').addEventListener('click', (e) => {
             e.stopPropagation();
             openChatWindow(roomId);
+        });
+        
+        item.querySelector('.btn-rename').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const newName = prompt("Enter a nickname for this friend:", room.customName || displayLabel);
+            if (newName && newName.trim() !== "") renameFriendRoom(roomId, newName.trim());
+        });
+
+        item.querySelector('.btn-leave').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (confirm("Delete and leave this friend chat?")) leaveFriendRoom(roomId);
         });
         listDiv.appendChild(item);
     });
 }
 
+async function renameFriendRoom(roomId, newName) {
+    try {
+        const response = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.name/`, {
+            method: 'PUT',
+            body: JSON.stringify({ name: newName }),
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
+        });
+        if (response.ok) {
+            roomsCache[roomId].customName = newName;
+            renderFriendsList();
+        }
+    } catch(e) { console.log("Rename fail"); }
+}
+
+async function leaveFriendRoom(roomId) {
+    try {
+        const response = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/leave`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
+        });
+        if (response.ok) {
+            delete roomsCache[roomId];
+            renderFriendsList();
+        }
+    } catch(e) { console.log("Leave fail"); }
+}
+
 document.getElementById('btn-add-friend').addEventListener('click', async () => {
     const targetMxid = document.getElementById('friend-mxid').value.trim();
-    if (!targetMxid.startsWith('@')) return alert('User handle format: @user:server.com');
+    if (!targetMxid.startsWith('@')) return alert('Use format: @user:server.com');
     try {
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, {
             method: 'POST',
@@ -202,23 +274,23 @@ document.getElementById('btn-add-friend').addEventListener('click', async () => 
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
         });
         if (!res.ok) throw new Error();
-        alert('Friend connection established! Waiting for system update.');
+        const data = await res.json();
+        
+        roomsCache[data.room_id] = { messages: [], customName: targetMxid.split(':')[0].replace('@', ''), isDirect: true };
         document.getElementById('friend-mxid').value = '';
         document.getElementById('add-friend-ui').classList.add('hidden');
-    } catch (err) {
-        alert('Channel creation failed or server blocked standard request.');
-    }
+        renderFriendsList();
+    } catch (err) { alert('Friend creation failed.'); }
 });
 
 function openChatWindow(roomId) {
     currentActiveRoomId = roomId;
-    document.getElementById('chat-title').textContent = `Room Channel: ${roomId.substring(0, 14)}...`;
+    const room = roomsCache[roomId];
+    document.getElementById('chat-title').textContent = `Chatting with: ${room.customName || roomId.substring(0, 10)}`;
     document.getElementById('chat-window').classList.remove('hidden');
     const msgBox = document.getElementById('chat-messages');
     msgBox.innerHTML = '';
-    if (roomsCache[roomId]) {
-        roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body));
-    }
+    if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body));
 }
 
 function appendLiveMessage(sender, body) {
@@ -249,7 +321,5 @@ async function sendMessage() {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
         });
         input.value = '';
-    } catch (e) {
-        console.log("Transmission failed.");
-    }
+    } catch (e) { console.log("Send failed."); }
 }
