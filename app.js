@@ -219,11 +219,9 @@ function processSyncPayload(data) {
     if (data.rooms && data.rooms.join) {
         for (const roomId in data.rooms.join) {
             if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null };
-            
             data.rooms.join[roomId].state?.events?.forEach(ev => { 
                 if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; 
             });
-
             const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
             timelineEvents.forEach(ev => {
                 if (ev.type === 'm.room.message' && ev.content?.body) {
@@ -286,9 +284,8 @@ document.getElementById('btn-add-app').addEventListener('click', () => {
     if (!name || !url) return alert('Please complete fields.'); 
     if (!url.startsWith('http')) url = 'https://' + url;
     
-    // FIXED: Strips out base path variables to ensure proper scraping from the Google Favicon Provider API
     const urlDomain = url.replace('https://','').replace('http://','').split('/');
-    const faviconUrl = `https://google.com{urlDomain[0]}`;
+    const faviconUrl = `https://google.com{urlDomain}`;
 
     osInstalledApps.push({ id: "win_" + Date.now(), name, url, iconImg: faviconUrl }); 
     localStorage.setItem('os_installed_apps', JSON.stringify(osInstalledApps));
@@ -319,9 +316,8 @@ function renderAppsEcosystem() {
 
         const iconNode = document.createElement('div'); 
         iconNode.className = "desktop-shortcut-node";
-        // FIXED: Re-mapped the property identifier from app.icon back to app.iconImg to fix missing desktop shortcut layout styles
         iconNode.innerHTML = `
-            <div class="desktop-app-icon" style="background-image: url('${app.iconImg}'); background-size: cover; background-position: center;"></div>
+            <div class="desktop-app-icon" style="background-image: url('${app.iconImg}'); background-size: cover; background-position: center; background-color: transparent;"></div>
             <div class="desktop-app-label">${app.name}</div>`;
         
         iconNode.addEventListener('dblclick', () => {
@@ -377,13 +373,14 @@ function openChatWindow(roomId) {
     if (roomsCache[roomId]) roomsCache[roomId].messages.forEach(m => appendLiveMessage(m.sender, m.body, m.origin_server_ts));
 }
 
-// FIXED: Formats standard live localized timestamps inside the message bubble node stream
+// FIXED: Clean string-only operations instead of calling methods onto raw array handlers to unlock chat bubble rendering!
 function appendLiveMessage(sender, body, timestamp) {
     const container = document.getElementById('chat-messages'); const isMe = sender === sessionData.userId;
     const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const cleanSender = sender.replace('@', '').split(':');
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
-            <span class="msg-sender">${sender.split(':').replace('@','')} • <span style="opacity:0.6;">${timeStr}</span></span>
+            <span class="msg-sender">${cleanSender} • <span style="opacity:0.6;">${timeStr}</span></span>
             <div class="msg-bubble">${body}</div>
         </div>`;
     container.insertAdjacentHTML('beforeend', msgHtml); container.scrollTop = container.scrollHeight;
