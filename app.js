@@ -41,7 +41,6 @@ function makeWindowDraggable() {
     let posX = 0, posY = 0, mouseX = 0, mouseY = 0;
 
     header.onmousedown = (e) => {
-        // Disallow window drag adjustments if fullscreen mode is currently deployed
         if (isChatFullscreen) return;
         if (e.target.closest('.window-controls-shelf')) return;
         
@@ -100,21 +99,18 @@ document.getElementById('btn-fullscreen-chat').addEventListener('click', () => {
     const btn = document.getElementById('btn-fullscreen-chat');
     
     if (!isChatFullscreen) {
-        // Cache current boundary positions before stretching layout canvas
         regularWindowPosition.top = win.style.top || "15%";
         regularWindowPosition.left = win.style.left || "15%";
         regularWindowPosition.width = win.style.width || "420px";
         regularWindowPosition.height = win.style.height || "500px";
         
-        // Apply clean standard fullscreen overlay positioning values
         win.style.top = "0px";
         win.style.left = "0px";
         win.style.width = "100vw";
-        win.style.height = "calc(100vh - 3.25rem)"; // Keep taskbar showing at bottom
+        win.style.height = "calc(100vh - 3.25rem)";
         btn.textContent = "❐";
         isChatFullscreen = true;
     } else {
-        // Revert geometry states to previous layout cache values
         win.style.top = regularWindowPosition.top;
         win.style.left = regularWindowPosition.left;
         win.style.width = regularWindowPosition.width;
@@ -162,14 +158,20 @@ window.addEventListener('load', () => {
     }
 });
 
-// Native HTTP REST Authentication Protocol
+// Native HTTP REST Authentication Protocol (FIXED: Handles complete string tokens and verbose descriptive errors)
 document.getElementById('btn-login').addEventListener('click', async () => {
     let baseUrl = document.getElementById('login-homeserver').value.trim();
-    const username = document.getElementById('login-username').value.trim();
+    let username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value.trim();
 
     if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
     if (!username || !password) return alert('Please enter all credentials.');
+
+    // If the username doesn't contain a server colon suffix, auto-format it to map your local domain handler
+    if (!username.includes(':') && username.startsWith('@')) {
+        const domain = baseUrl.replace('https://', '').replace('http://', '');
+        username = `${username}:${domain}`;
+    }
 
     try {
         const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
@@ -181,16 +183,23 @@ document.getElementById('btn-login').addEventListener('click', async () => {
             }),
             headers: { 'Content-Type': 'application/json' }
         });
-        if (!response.ok) throw new Error();
+
+        if (!response.ok) {
+            const errDetails = await response.json();
+            throw new Error(errDetails.error || "Invalid username or account secret key password.");
+        }
+        
         const data = await response.json();
         sessionData = { baseUrl, accessToken: data.access_token, userId: data.user_id };
         localStorage.setItem('elementos_session', JSON.stringify(sessionData));
         enterDesktopMode();
-    } catch (err) { alert('Authentication Error'); }
+    } catch (err) { 
+        alert('Authentication Error: ' + err.message); 
+    }
 });
 function enterDesktopMode() {
     if (!sessionData) return;
-    const shortUser = sessionData.userId.split(':').replace('@', '');
+    const shortUser = sessionData.userId.split(':')[0].replace('@', '');
     
     document.getElementById('menu-displayname').textContent = sessionData.userId;
     document.getElementById('menu-avatar').textContent = shortUser.substring(0, 2).toUpperCase();
@@ -289,7 +298,7 @@ document.getElementById('btn-add-friend').addEventListener('click', async () => 
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         if (!res.ok) throw new Error();
         const data = await res.json();
-        roomsCache[data.room_id] = { messages: [], customName: targetMxid.split(':').replace('@', ''), isDirect: true };
+        roomsCache[data.room_id] = { messages: [], customName: targetMxid.split(':')[0].replace('@', ''), isDirect: true };
         document.getElementById('friend-mxid').value = '';
         document.getElementById('add-friend-ui').classList.add('hidden');
         renderFriendsList();
@@ -311,7 +320,7 @@ function openChatWindow(roomId) {
 function appendLiveMessage(sender, body) {
     const container = document.getElementById('chat-messages');
     const isMe = sender === sessionData.userId;
-    const cleanSender = sender.split(':').replace('@', '');
+    const cleanSender = sender.split(':')[0].replace('@', '');
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
             <span class="msg-sender">${cleanSender}</span>
