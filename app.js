@@ -8,7 +8,7 @@ let isSyncing = false;
 // Window Layout Geometric Context Cache Tracking States
 let isChatFullscreen = false;
 let regularWindowPosition = { top: "15%", left: "15%", width: "420px", height: "500px" };
-let currentActiveCallId = null; // Caches target signaling handles for real-time hooks
+let currentActiveCallId = null; 
 
 function toggleVisibility(id) {
     const el = document.getElementById(id);
@@ -68,7 +68,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('elementos_session');
     window.location.reload();
 });
-// Native Window Utility Actions Component Modules
+// New Native Window Utility Actions Component Modules
 document.getElementById('btn-close-chat').addEventListener('click', () => {
     document.getElementById('chat-window').classList.add('hidden');
     document.getElementById('minimized-dock-indicator').classList.add('hidden');
@@ -220,9 +220,10 @@ document.getElementById('btn-login').addEventListener('click', async () => {
         enterDesktopMode();
     } catch (err) { alert('Authentication Error: ' + err.message); }
 });
+// FIXED: Extracted user label strictly on String operations to prevent array crash faults
 function enterDesktopMode() {
     if (!sessionData) return;
-    const shortUser = sessionData.userId.split(':').replace('@', '');
+    const shortUser = sessionData.userId.replace('@', '').split(':')[0];
     
     document.getElementById('menu-displayname').textContent = sessionData.userId;
     document.getElementById('menu-avatar').textContent = shortUser.substring(0, 2).toUpperCase();
@@ -257,21 +258,17 @@ function processSyncPayload(data) {
             data.account_data?.events?.forEach(ev => { if (ev.type === "m.direct") roomsCache[roomId].isDirect = true; });
             data.rooms.join[roomId].state?.events?.forEach(ev => { if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; });
             
-            // Intercept Inbound Matrix WebRTC Signaling Call Packets
             const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
             timelineEvents.forEach(ev => {
                 if (ev.type === "m.call.invite" && ev.sender !== sessionData.userId) {
                     currentActiveCallId = ev.content.call_id;
                     currentActiveRoomId = roomId;
-                    
                     document.getElementById('incoming-call-caller').textContent = ev.sender;
                     document.getElementById('system-incoming-call-alert').classList.remove('hidden');
                 }
-                
                 if (ev.type === "m.call.answer" && ev.sender !== sessionData.userId) {
                     alert("Your placed call has been answered on the other end!");
                 }
-                
                 if (ev.type === 'm.room.message' && ev.content?.body) {
                     roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body });
                     if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body);
@@ -336,7 +333,7 @@ document.getElementById('btn-add-friend').addEventListener('click', async () => 
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         if (!res.ok) throw new Error();
         const data = await res.json();
-        roomsCache[data.room_id] = { messages: [], customName: targetMxid.split(':').replace('@', ''), isDirect: true };
+        roomsCache[data.room_id] = { messages: [], customName: targetMxid.replace('@', '').split(':')[0], isDirect: true };
         document.getElementById('friend-mxid').value = '';
         document.getElementById('add-friend-ui').classList.add('hidden');
         renderFriendsList();
@@ -377,7 +374,7 @@ async function sendMessage() {
     if (!text || !currentActiveRoomId) return;
     try {
         const txnId = Date.now();
-        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.text/${txnId}`, { method: 'PUT', body: JSON.stringify({ msgtype: "m.text", body: text }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
+        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, { method: 'PUT', body: JSON.stringify({ msgtype: "m.text", body: text }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         input.value = '';
     } catch (e) { console.log("Send failed."); }
 }
