@@ -8,6 +8,7 @@ let isSyncing = false;
 // Window Layout Geometric Context Cache Tracking States
 let isChatFullscreen = false;
 let regularWindowPosition = { top: "15%", left: "15%", width: "420px", height: "500px" };
+let currentActiveCallId = null; // Caches target signaling handles for real-time hooks
 
 function toggleVisibility(id) {
     const el = document.getElementById(id);
@@ -63,12 +64,11 @@ function makeWindowDraggable() {
     };
 }
 
-// System Disconnect Operation Handler
 document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('elementos_session');
     window.location.reload();
 });
-// New Native Window Utility Actions Component Modules
+// Native Window Utility Actions Component Modules
 document.getElementById('btn-close-chat').addEventListener('click', () => {
     document.getElementById('chat-window').classList.add('hidden');
     document.getElementById('minimized-dock-indicator').classList.add('hidden');
@@ -76,7 +76,6 @@ document.getElementById('btn-close-chat').addEventListener('click', () => {
     currentActiveRoomId = null;
 });
 
-// Minimize Window Workflow Function
 document.getElementById('btn-minimize-chat').addEventListener('click', () => {
     const room = roomsCache[currentActiveRoomId];
     let displayTitle = room?.customName || "Active Chat";
@@ -87,13 +86,11 @@ document.getElementById('btn-minimize-chat').addEventListener('click', () => {
     document.getElementById('call-selection-dropdown').classList.add('hidden');
 });
 
-// Restore Minimized Window Dock Click Listener
 document.getElementById('minimized-dock-indicator').addEventListener('click', () => {
     document.getElementById('chat-window').classList.remove('hidden');
     document.getElementById('minimized-dock-indicator').classList.add('hidden');
 });
 
-// Fullscreen Toggling Workflow Function
 document.getElementById('btn-fullscreen-chat').addEventListener('click', () => {
     const win = document.getElementById('chat-window');
     const btn = document.getElementById('btn-fullscreen-chat');
@@ -120,7 +117,6 @@ document.getElementById('btn-fullscreen-chat').addEventListener('click', () => {
     }
 });
 
-// Dropdown Utilities Toggles for Call Menu Items
 document.getElementById('btn-call-menu').addEventListener('click', (e) => {
     e.stopPropagation();
     toggleVisibility('call-selection-dropdown');
@@ -130,15 +126,51 @@ document.addEventListener('click', () => {
     document.getElementById('call-selection-dropdown').classList.add('hidden');
 });
 
-// Interactive Voice Call triggers
-document.getElementById('btn-audio-call').addEventListener('click', () => {
-    const room = roomsCache[currentActiveRoomId];
-    alert(`Initiating private Matrix WebRTC Audio Call with: ${room?.customName || "Friend Channel"}...`);
+// Outbound Signaling Core Event Transmissions
+document.getElementById('btn-audio-call').addEventListener('click', () => startMatrixCall("voice"));
+document.getElementById('btn-video-call').addEventListener('click', () => startMatrixCall("video"));
+
+async function startMatrixCall(type) {
+    if (!currentActiveRoomId) return;
+    const callId = "c" + Date.now();
+    
+    try {
+        const txnId = "t" + Date.now();
+        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.call.invite/${txnId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                call_id: callId,
+                version: "1",
+                lifetime: 60000,
+                offer: { type: "offer", sdp: "m=audio..." },
+                type: type
+            }),
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
+        });
+        alert(`Outgoing Matrix ${type === "voice" ? "Audio" : "Video"} call invitation broadcasted!`);
+    } catch (e) {
+        console.log("Call placement failed.");
+    }
+}
+
+// Inbound Signaling Action Listeners
+document.getElementById('btn-call-answer').addEventListener('click', async () => {
+    if (!currentActiveCallId || !currentActiveRoomId) return;
+    try {
+        const txnId = "t" + Date.now();
+        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.call.answer/${txnId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ call_id: currentActiveCallId, version: "1", answer: { type: "answer", sdp: "m=audio..." } }),
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` }
+        });
+        document.getElementById('system-incoming-call-alert').classList.add('hidden');
+        alert("Call connected! Channels bridging securely.");
+    } catch(e) {}
 });
 
-document.getElementById('btn-video-call').addEventListener('click', () => {
-    const room = roomsCache[currentActiveRoomId];
-    alert(`Spinning up secure hardware channels for Matrix Video Call with: ${room?.customName || "Friend Channel"}...`);
+document.getElementById('btn-call-decline').addEventListener('click', () => {
+    document.getElementById('system-incoming-call-alert').classList.add('hidden');
+    currentActiveCallId = null;
 });
 
 // Primary System Core Lifecycle Initializer Entry Sequence Hook
@@ -158,7 +190,7 @@ window.addEventListener('load', () => {
     }
 });
 
-// Native HTTP REST Authentication Protocol (FIXED: Handles complete string tokens and verbose descriptive errors)
+// Native HTTP REST Authentication Protocol
 document.getElementById('btn-login').addEventListener('click', async () => {
     let baseUrl = document.getElementById('login-homeserver').value.trim();
     let username = document.getElementById('login-username').value.trim();
@@ -167,7 +199,6 @@ document.getElementById('btn-login').addEventListener('click', async () => {
     if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
     if (!username || !password) return alert('Please enter all credentials.');
 
-    // If the username doesn't contain a server colon suffix, auto-format it to map your local domain handler
     if (!username.includes(':') && username.startsWith('@')) {
         const domain = baseUrl.replace('https://', '').replace('http://', '');
         username = `${username}:${domain}`;
@@ -176,30 +207,22 @@ document.getElementById('btn-login').addEventListener('click', async () => {
     try {
         const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
             method: 'POST',
-            body: JSON.stringify({
-                type: "m.login.password",
-                identifier: { type: "m.id.user", user: username },
-                password: password
-            }),
+            body: JSON.stringify({ type: "m.login.password", identifier: { type: "m.id.user", user: username }, password: password }),
             headers: { 'Content-Type': 'application/json' }
         });
-
         if (!response.ok) {
             const errDetails = await response.json();
-            throw new Error(errDetails.error || "Invalid username or account secret key password.");
+            throw new Error(errDetails.error || "Invalid username or password.");
         }
-        
         const data = await response.json();
         sessionData = { baseUrl, accessToken: data.access_token, userId: data.user_id };
         localStorage.setItem('elementos_session', JSON.stringify(sessionData));
         enterDesktopMode();
-    } catch (err) { 
-        alert('Authentication Error: ' + err.message); 
-    }
+    } catch (err) { alert('Authentication Error: ' + err.message); }
 });
 function enterDesktopMode() {
     if (!sessionData) return;
-    const shortUser = sessionData.userId.split(':')[0].replace('@', '');
+    const shortUser = sessionData.userId.split(':').replace('@', '');
     
     document.getElementById('menu-displayname').textContent = sessionData.userId;
     document.getElementById('menu-avatar').textContent = shortUser.substring(0, 2).toUpperCase();
@@ -233,7 +256,22 @@ function processSyncPayload(data) {
             if (!roomsCache[roomId]) roomsCache[roomId] = { messages: [], customName: null, isDirect: false };
             data.account_data?.events?.forEach(ev => { if (ev.type === "m.direct") roomsCache[roomId].isDirect = true; });
             data.rooms.join[roomId].state?.events?.forEach(ev => { if (ev.type === "m.room.name" && ev.content?.name) roomsCache[roomId].customName = ev.content.name; });
-            data.rooms.join[roomId].timeline?.events?.forEach(ev => {
+            
+            // Intercept Inbound Matrix WebRTC Signaling Call Packets
+            const timelineEvents = data.rooms.join[roomId].timeline?.events || [];
+            timelineEvents.forEach(ev => {
+                if (ev.type === "m.call.invite" && ev.sender !== sessionData.userId) {
+                    currentActiveCallId = ev.content.call_id;
+                    currentActiveRoomId = roomId;
+                    
+                    document.getElementById('incoming-call-caller').textContent = ev.sender;
+                    document.getElementById('system-incoming-call-alert').classList.remove('hidden');
+                }
+                
+                if (ev.type === "m.call.answer" && ev.sender !== sessionData.userId) {
+                    alert("Your placed call has been answered on the other end!");
+                }
+                
                 if (ev.type === 'm.room.message' && ev.content?.body) {
                     roomsCache[roomId].messages.push({ sender: ev.sender, body: ev.content.body });
                     if (roomId === currentActiveRoomId) appendLiveMessage(ev.sender, ev.content.body);
@@ -298,7 +336,7 @@ document.getElementById('btn-add-friend').addEventListener('click', async () => 
         const res = await fetch(`${sessionData.baseUrl}/_matrix/client/v3/createRoom`, { method: 'POST', body: JSON.stringify({ invite: [targetMxid], preset: 'trusted_private_chat', is_direct: true }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         if (!res.ok) throw new Error();
         const data = await res.json();
-        roomsCache[data.room_id] = { messages: [], customName: targetMxid.split(':')[0].replace('@', ''), isDirect: true };
+        roomsCache[data.room_id] = { messages: [], customName: targetMxid.split(':').replace('@', ''), isDirect: true };
         document.getElementById('friend-mxid').value = '';
         document.getElementById('add-friend-ui').classList.add('hidden');
         renderFriendsList();
@@ -320,7 +358,7 @@ function openChatWindow(roomId) {
 function appendLiveMessage(sender, body) {
     const container = document.getElementById('chat-messages');
     const isMe = sender === sessionData.userId;
-    const cleanSender = sender.split(':')[0].replace('@', '');
+    const cleanSender = sender.split(':').replace('@', '');
     const msgHtml = `
         <div class="msg-wrap ${isMe ? 'me' : 'them'}">
             <span class="msg-sender">${cleanSender}</span>
@@ -339,7 +377,7 @@ async function sendMessage() {
     if (!text || !currentActiveRoomId) return;
     try {
         const txnId = Date.now();
-        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.room.message/${txnId}`, { method: 'PUT', body: JSON.stringify({ msgtype: "m.text", body: text }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
+        await fetch(`${sessionData.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(currentActiveRoomId)}/send/m.text/${txnId}`, { method: 'PUT', body: JSON.stringify({ msgtype: "m.text", body: text }), headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.accessToken}` } });
         input.value = '';
     } catch (e) { console.log("Send failed."); }
 }

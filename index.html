@@ -24,11 +24,10 @@
 
     <!-- 2. MAIN ACTIVE DESKTOP FRAMEWORK -->
     <main id="desktop" class="hidden">
-        <!-- Floating Active Messaging Window with New Native Utilities -->
+        <!-- Floating Active Messaging Window with Native Utilities -->
         <div id="chat-window" class="window flex-column">
             <div class="window-header" id="chat-header">
                 <span id="chat-title" class="window-title">Chat</span>
-                <!-- ChromeOS Window Controls Cluster Shelf -->
                 <div class="window-controls-shelf" style="display: flex; align-items: center; gap: 10px;">
                     <button id="btn-call-menu" class="window-control-action" title="Start Call" style="background: none; border: none; color: #2dd4bf; cursor: pointer; font-size: 0.95rem;">📞</button>
                     <button id="btn-minimize-chat" class="window-control-action" title="Minimize" style="background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 1.1rem; padding-bottom: 4px;">—</button>
@@ -37,7 +36,7 @@
                 </div>
             </div>
 
-            <!-- Absolute Position Call Selection Dropdown Panel -->
+            <!-- Call Selection Dropdown Panel -->
             <div id="call-selection-dropdown" class="hidden" style="position: absolute; top: 40px; right: 80px; background: #1f2937; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.5rem; width: 140px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); z-index: 50; overflow: hidden;">
                 <button id="btn-audio-call" style="width: 100%; padding: 0.6rem; background: none; border: none; color: #fff; text-align: left; font-size: 0.8rem; cursor: pointer; transition: background 0.2s;">🎵 Audio Call</button>
                 <button id="btn-video-call" style="width: 100%; padding: 0.6rem; background: none; border: none; color: #fff; text-align: left; font-size: 0.8rem; cursor: pointer; border-top: 1px solid rgba(255,255,255,0.08); transition: background 0.2s;">📹 Video Call</button>
@@ -47,6 +46,17 @@
             <div class="chat-footer">
                 <input id="chat-input" type="text" placeholder="Type a message..." class="sys-input">
                 <button id="btn-send" class="sys-btn send-sizing">Send</button>
+            </div>
+        </div>
+
+        <!-- FIXED: Removed text-center property from the absolute layout parent block container -->
+        <div id="system-incoming-call-alert" class="hidden" style="position: absolute; top: 2rem; left: 50%; transform: translateX(-50%); width: 340px; background: rgba(31, 41, 55, 0.95); border: 2px solid #0d9488; padding: 1.25rem; border-radius: 1.25rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); z-index: 100;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem; text-align: center;">📞</div>
+            <h4 style="font-size: 0.95rem; font-weight: 600; text-align: center; color: #fff; margin-bottom: 0.25rem;">Incoming System Call</h4>
+            <p id="incoming-call-caller" style="font-size: 0.75rem; color: #9ca3af; text-align: center; margin-bottom: 1.25rem; word-break: break-all;">@user:matrix.org</p>
+            <div style="display: flex; gap: 0.75rem;">
+                <button id="btn-call-answer" style="flex: 1; background: #0d9488; color: white; border: none; padding: 0.6rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Answer</button>
+                <button id="btn-call-decline" style="flex: 1; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.6rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Decline</button>
             </div>
         </div>
 
